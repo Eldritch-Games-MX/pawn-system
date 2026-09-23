@@ -1,0 +1,16 @@
+{
+    "name": "EldritchGames.PawnSystem.TestUtilities",
+    "rootNamespace": "EldritchGames.PawnSystem.TestUtilities",
+    "references": [
+        "EldritchGames.PawnSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

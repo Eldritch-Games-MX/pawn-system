@@ -1,0 +1,25 @@
+{
+    "name": "EldritchGames.PawnSystem.InputSystem",
+    "rootNamespace": "EldritchGames.PawnSystem.InputSystem",
+    "references": [
+        "EldritchGames.PawnSystem",
+        "EldritchGames.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "ELDRITCH_INPUTSYSTEM"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.eldritchgames.inputsystem",
+            "expression": "1.0.0",
+            "define": "ELDRITCH_INPUTSYSTEM"
+        }
+    ],
+    "noEngineReferences": false
+}

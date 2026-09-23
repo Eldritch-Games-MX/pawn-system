@@ -1,0 +1,25 @@
+{
+    "name": "EldritchGames.PawnSystem.AbilitySystem",
+    "rootNamespace": "EldritchGames.PawnSystem.AbilitySystem",
+    "references": [
+        "EldritchGames.PawnSystem",
+        "EldritchGames.AbilitySystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "ELDRITCH_ABILITYSYSTEM"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.eldritchgames.abilitysystem",
+            "expression": "0.1.0",
+            "define": "ELDRITCH_ABILITYSYSTEM"
+        }
+    ],
+    "noEngineReferences": false
+}

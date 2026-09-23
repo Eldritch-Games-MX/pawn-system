@@ -1,0 +1,23 @@
+{
+    "name": "EldritchGames.PawnSystem.Tests.PlayMode",
+    "rootNamespace": "EldritchGames.PawnSystem.Tests.PlayMode",
+    "references": [
+        "EldritchGames.PawnSystem",
+        "EldritchGames.PawnSystem.TestUtilities",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

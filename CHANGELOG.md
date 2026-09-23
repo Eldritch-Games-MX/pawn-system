@@ -1,0 +1,22 @@
+# Changelog
+
+All notable changes to this package are documented in this file.
+
+## [0.1.0] - Unreleased
+
+### Added
+- Initial pawn core: `Pawn` (the one MonoBehaviour), `PawnDefinition`, `PawnState`, and the `SpawnResult` / `PossessionResult` / `ReviveResult` outcome enums. Every state change validates before it mutates, so a call that returns a failure code has changed nothing and raised no events.
+- Lifecycle: `Spawn` / `Despawn` / `Kill` / `TryRevive`, with `Spawned`, `Despawned`, `Died`, `Revived`, `DamageTaken`, `Possessed` and `Released` events. Despawning never destroys anything, so a pooled pawn cycles `Despawned → Alive → Dead → Despawned` indefinitely.
+- Symmetric possession: `IPawnPossessor` with `TryPossess` (fails when occupied), `Possess` (swaps), and `Release`. Player controllers and AI brains are peers — the pawn never learns which it has. Death releases the possessor unless `PawnDefinition.ReleaseOnDeath` says otherwise, and a possessor callback that throws rolls the possession back.
+- Identity: hierarchical dotted `PawnTag` / `PawnTagContainer` (same convention as the Ability System's `GameplayTag`, declared separately to keep zero dependencies), `TeamDefinition` with per-team hostile/friendly lists, `ITeamResolver` with a `DefaultTeamResolver`, and `Pawn.ViewPoint` as the eyes/aim origin cameras, AI perception and targeting all need.
+- Vitals: `IVitalSource` as the seam, `Health` as the plain-C# default, `IDamageable`, immutable `DamageInfo` with provenance (instigator, source, hit zone, impact point), `DeathInfo` with overkill, `ReviveInfo`, and `DamageTypeDefinition` assets replacing a closed damage-type enum. `IgnoresInvulnerability` on a damage type covers scripted and story deaths.
+- Damage pipeline: `IDamageModifier` authored as a `[SerializeReference]` list on the definition and run before any `IDamageModifier` components on the pawn, in a documented order, with the component list cached so no hit allocates. Ships `FlatDamageReduction` as the minimal built-in. `DamageReceiver` adds per-collider hit zones with their own multiplier and body-part tag.
+- Deliberate rule change from the earlier pawn prototype: healing a dead pawn does nothing. Revival is `TryRevive` and nothing else, so a stray area-of-effect heal can never resurrect a corpse.
+- Movement: `IPawnMotor` (velocity in, time passed in, no `Time.deltaTime` inside) with a built-in `CharacterControllerMotor`. Movement is entirely optional — a turret or a turn-based portrait is a pawn with no motor.
+- Lifecycle services: `PawnRegistry` (allocation-free queries by team, tag and state, plus `FindNearest`), `PawnSpawner`, `ISpawnPointProvider` with a round-robin `TransformSpawnPointProvider`, `IRespawnPolicy` with `DelayedRespawnPolicy` (delay plus optional life count), and `IPawnPool` with `SimplePawnPool`.
+- Persistence: opt-in `CaptureState` / `RestoreState` extension methods, `[Serializable]` `PawnSaveData` keyed by string ids, and `ITeamLookup` to resolve teams back to assets. Restoring drives the pawn through its normal lifecycle methods rather than writing state behind their backs.
+- Optional `EldritchGames.PawnSystem.InputSystem` assembly: `ControllerPossessor` (possession by an Eldritch Input System `IController`), `PawnInputTarget` (forwards `ICommand`s to the pawn's capabilities, dropping them while dead or unpossessed), `NullPawnController` for a controller between bodies, and `MovePawnCommand` / `LookPawnCommand` as worked examples.
+- Optional `EldritchGames.PawnSystem.AbilitySystem` assembly: `AttributeVitalSource` binds a pawn's vitals to an `AbilitySystemComponent` attribute so damage, costs and regeneration all move one number, and `AbilityVitalsBinder` does that wiring from the inspector.
+- Both adapters are guarded by `versionDefines` → `defineConstraints`, so the package still compiles in a project that has neither sibling package installed.
+- Editor tooling: `SerializeReference` polymorphic list drawer with `[PawnDoc]` summaries, a grouped `PawnDefinition` inspector with an icon header, contextual help boxes and inline validation, and **Eldritch Games > Pawn System > Validate Pawn Definitions** for a project-wide sweep.
+- EditMode and PlayMode test suites, including a genre-proof suite that drives the same pawn through a turn-based round counter and a real-time frame clock.

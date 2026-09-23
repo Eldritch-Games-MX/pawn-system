@@ -1,0 +1,34 @@
+{
+    "name": "EldritchGames.PawnSystem.InputSystem.Tests.EditMode",
+    "rootNamespace": "EldritchGames.PawnSystem.InputSystem.Tests.EditMode",
+    "references": [
+        "EldritchGames.PawnSystem",
+        "EldritchGames.PawnSystem.InputSystem",
+        "EldritchGames.InputSystem",
+        "EldritchGames.PawnSystem.TestUtilities",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "ELDRITCH_INPUTSYSTEM"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.eldritchgames.inputsystem",
+            "expression": "1.0.0",
+            "define": "ELDRITCH_INPUTSYSTEM"
+        }
+    ],
+    "noEngineReferences": false
+}
