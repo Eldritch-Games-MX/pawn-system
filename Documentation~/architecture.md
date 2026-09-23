@@ -10,7 +10,9 @@
   switches. Read on spawn, never written to.
 - **`IPawnPossessor`** — whatever drives the pawn. Two callbacks, no state.
 - **`IVitalSource`** — the clamped number the pawn dies when it runs out of.
+- **`PawnResourcePool`** — any number of *other* clamped numbers that never kill it, keyed by `ResourceDefinition`.
 - **`IPawnMotor`** — how the pawn moves, if it moves at all.
+- **`IPawnAuthority`** — an optional networked-ownership marker; see [Networking is a marker, not a system](#networking-is-a-marker-not-a-system).
 
 ## Possession is symmetric
 
@@ -62,12 +64,13 @@ proven to work under both clocks in a single test suite.
 ```
 weapon → DamageReceiver (hit zone multiplier, body part tag)
        → Pawn.ApplyDamage
+            already Incapacitated? → any qualifying hit finishes straight to Dead, pipeline skipped
             alive? positive? not invulnerable?
             → definition modifiers, top to bottom
             → component modifiers, in component order
             → IVitalSource.ApplyDelta
             → DamageTaken
-            → Die(DeathInfo) when vitals hit zero
+            → fatal? CanBeIncapacitated? → Incapacitate(DeathInfo) : Die(DeathInfo)
 ```
 
 Order is part of the contract, not an accident: a flat reduction before a
@@ -80,6 +83,48 @@ The component modifier list is cached on spawn; call
 `Pawn.RefreshComponentModifiers` after adding or removing one at runtime. This is
 a deliberate fix to the older pawn prototype, which called `GetComponents` on
 every hit.
+
+## Incapacitation is an extra step, not a second pipeline
+
+`PawnState.Incapacitated` sits between `Alive` and `Dead`, opt-in per
+`PawnDefinition.CanBeIncapacitated`. It reuses everything above rather than
+duplicating it:
+
+- A fatal blow on an incapacitation-capable pawn calls `Incapacitate(DeathInfo)`
+  instead of `Die(DeathInfo)` — same modifier pipeline, same `DeathInfo`, one
+  branch at the very end.
+- A pawn that is *already* incapacitated takes a shortcut in `ApplyDamage`:
+  invulnerability is still checked, but the modifier pipeline is skipped
+  entirely — armor does not save a downed target — and any qualifying hit calls
+  `Die` directly.
+- `TryRevive` accepts `Dead` or `Incapacitated` as its source state and produces
+  the same `Revived` event either way. There is no separate "pick up a downed
+  teammate" API — recovering a corpse and recovering a downed pawn are the same
+  operation from the pawn's point of view.
+- `Kill()` always goes straight to `Dead`, whether called on a living pawn or to
+  finish one already down. It is the one path that never routes through
+  `Incapacitated`, by design — it is the "no matter what" method.
+- An optional bleed-out timer (`PawnDefinition.IncapacitationDuration`) is just
+  another field `Tick` counts down, exactly like the invulnerability grace
+  period already did.
+
+Nothing that does not set `CanBeIncapacitated` ever sees any of this — a fatal
+blow kills on the spot exactly as it always did.
+
+## Secondary resources reuse `Health`
+
+`PawnResourcePool` does not reimplement clamping; each registered resource is a
+`Health` instance internally, keyed by its `ResourceDefinition`. The pool adds
+nothing on top except the registration bookkeeping and a `Changed` event that
+also reports *which* resource changed. This mirrors the Ability System's
+`AttributeSet` in shape (`Register` / `IsRegistered` / `GetCurrentValue` /
+`ModifyBaseValue`-equivalents) without referencing it, for the same zero-dependency reason as `PawnTag`.
+
+`PawnDefinition.InitialResources` is a plain list of `ResourceDefinition`
+assets — no per-pawn override struct — because a resource's `DefaultMax` already
+lives on the definition, the same way `AttributeDefinition.DefaultValue` does in
+the Ability System. `Pawn.Spawn()` calls `RegisterOrRefill` for each one, so a
+pooled pawn's mana comes back full exactly like its vitals do.
 
 ## Vitals are a seam, not a class
 

@@ -63,6 +63,26 @@ namespace EldritchGames.PawnSystem.TestUtilities
         public PawnDefinitionBuilder WithDeactivateOnDespawn(bool deactivateOnDespawn) =>
             SetField("deactivateOnDespawn", deactivateOnDespawn);
 
+        /// <summary>Sets whether a fatal blow downs this pawn instead of killing it outright.</summary>
+        /// <param name="canBeIncapacitated">Whether to allow incapacitation.</param>
+        public PawnDefinitionBuilder WithCanBeIncapacitated(bool canBeIncapacitated) =>
+            SetField("canBeIncapacitated", canBeIncapacitated);
+
+        /// <summary>Sets the bleed-out timer for a downed pawn.</summary>
+        /// <param name="seconds">Seconds until an unrecovered pawn dies. Zero or less disables the timer.</param>
+        public PawnDefinitionBuilder WithIncapacitationDuration(float seconds) =>
+            SetField("incapacitationDuration", seconds);
+
+        /// <summary>Sets whether being downed releases the possessor.</summary>
+        /// <param name="releaseOnIncapacitation">Whether to release.</param>
+        public PawnDefinitionBuilder WithReleaseOnIncapacitation(bool releaseOnIncapacitation) =>
+            SetField("releaseOnIncapacitation", releaseOnIncapacitation);
+
+        /// <summary>Sets the secondary resources this pawn starts with.</summary>
+        /// <param name="resources">The resources.</param>
+        public PawnDefinitionBuilder WithInitialResources(params ResourceDefinition[] resources) =>
+            SetField("initialResources", new List<ResourceDefinition>(resources));
+
         /// <summary>Returns the configured definition.</summary>
         public PawnDefinition Build() => definition;
 

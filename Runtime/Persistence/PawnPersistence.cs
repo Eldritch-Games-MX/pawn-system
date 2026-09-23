@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using EldritchGames.PawnSystem.Identity;
 using EldritchGames.PawnSystem.Vitals;
 using UnityEngine;
@@ -32,6 +33,7 @@ namespace EldritchGames.PawnSystem.Persistence
 
             var data = new PawnSaveData
             {
+                schemaVersion = PawnSaveData.CurrentSchemaVersion,
                 pawnId = pawn.Definition != null ? pawn.Definition.Id : string.Empty,
                 state = (int)pawn.State,
                 teamId = pawn.Team != null ? pawn.Team.Id : string.Empty,
@@ -51,6 +53,18 @@ namespace EldritchGames.PawnSystem.Persistence
             foreach (PawnTag tag in pawn.Tags) tags[index++] = tag.Value;
             data.tags = tags;
 
+            var resources = new List<ResourceSaveData>();
+            foreach (ResourceDefinition resource in pawn.Resources.RegisteredResources)
+            {
+                resources.Add(new ResourceSaveData
+                {
+                    resourceId = resource.Id,
+                    current = pawn.Resources.GetCurrent(resource),
+                    max = pawn.Resources.GetMax(resource)
+                });
+            }
+            data.resources = resources.ToArray();
+
             return data;
         }
 
@@ -61,12 +75,16 @@ namespace EldritchGames.PawnSystem.Persistence
         /// <param name="pawn">The pawn to restore into.</param>
         /// <param name="data">The record to restore from.</param>
         /// <param name="teamLookup">Resolves the saved team id back to an asset. <c>null</c> leaves the pawn's current team alone.</param>
+        /// <param name="resourceLookup">Resolves saved resource ids back to assets. <c>null</c> skips restoring secondary resources entirely.</param>
         /// <exception cref="ArgumentNullException"><paramref name="pawn"/> or <paramref name="data"/> is <c>null</c>.</exception>
         /// <remarks>
-        /// Unknown team ids and tags are restored as far as they can be rather than throwing — a
-        /// renamed team leaves the pawn on its default side instead of failing the whole load.
+        /// Unknown team ids, tags and resource ids are restored as far as they can be rather than
+        /// throwing — a renamed team or resource leaves that one thing at its default instead of
+        /// failing the whole load. A pawn restored into <see cref="PawnState.Incapacitated"/>
+        /// raises <see cref="Pawn.Incapacitated"/> during the load, the same way a pawn restored
+        /// into <see cref="PawnState.Dead"/> raises <see cref="Pawn.Died"/>.
         /// </remarks>
-        public static void RestoreState(this Pawn pawn, PawnSaveData data, ITeamLookup teamLookup = null)
+        public static void RestoreState(this Pawn pawn, PawnSaveData data, ITeamLookup teamLookup = null, IResourceLookup resourceLookup = null)
         {
             if (pawn == null) throw new ArgumentNullException(nameof(pawn));
             if (data == null) throw new ArgumentNullException(nameof(data));
@@ -83,7 +101,8 @@ namespace EldritchGames.PawnSystem.Persistence
 
                 case PawnState.Alive:
                 case PawnState.Dead:
-                    RestoreIntoWorld(pawn, data, teamLookup, state);
+                case PawnState.Incapacitated:
+                    RestoreIntoWorld(pawn, data, teamLookup, resourceLookup, state);
                     return;
 
                 default:
@@ -91,9 +110,9 @@ namespace EldritchGames.PawnSystem.Persistence
             }
         }
 
-        private static void RestoreIntoWorld(Pawn pawn, PawnSaveData data, ITeamLookup teamLookup, PawnState state)
+        private static void RestoreIntoWorld(Pawn pawn, PawnSaveData data, ITeamLookup teamLookup, IResourceLookup resourceLookup, PawnState state)
         {
-            if (pawn.State == PawnState.Dead) pawn.TryRevive(ReviveInfo.Full);
+            if (pawn.State == PawnState.Dead || pawn.State == PawnState.Incapacitated) pawn.TryRevive(ReviveInfo.Full);
             if (pawn.State != PawnState.Alive)
             {
                 pawn.Despawn();
@@ -107,6 +126,7 @@ namespace EldritchGames.PawnSystem.Persistence
             if (data.vitalMax > 0f) pawn.Vitals.SetMax(data.vitalMax);
             RestoreTeam(pawn, data, teamLookup);
             RestoreTags(pawn, data);
+            RestoreResources(pawn, data, resourceLookup);
 
             if (state == PawnState.Dead)
             {
@@ -114,8 +134,32 @@ namespace EldritchGames.PawnSystem.Persistence
                 return;
             }
 
+            if (state == PawnState.Incapacitated)
+            {
+                float toZero = -pawn.Vitals.Current;
+                if (toZero != 0f) pawn.Vitals.ApplyDelta(toZero);
+                pawn.Incapacitate(default);
+                return;
+            }
+
             float delta = data.vitalCurrent - pawn.Vitals.Current;
             if (delta != 0f) pawn.Vitals.ApplyDelta(delta);
+        }
+
+        private static void RestoreResources(Pawn pawn, PawnSaveData data, IResourceLookup resourceLookup)
+        {
+            if (resourceLookup == null || data.resources == null) return;
+
+            for (int i = 0; i < data.resources.Length; i++)
+            {
+                ResourceSaveData saved = data.resources[i];
+                if (saved == null) continue;
+
+                ResourceDefinition resource = resourceLookup.FindResource(saved.resourceId);
+                if (resource == null) continue;
+
+                pawn.Resources.Restore(resource, saved.max, saved.current);
+            }
         }
 
         private static void RestoreTeam(Pawn pawn, PawnSaveData data, ITeamLookup teamLookup)

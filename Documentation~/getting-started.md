@@ -16,6 +16,11 @@
   ships with the package; your own implementations appear in the same dropdown.
 - **Spawn Invulnerability**, **Release On Death**, **Deactivate On Despawn** —
   the lifecycle switches.
+- **Can Be Incapacitated**, **Incapacitation Duration**, **Release On
+  Incapacitation** — leave off for a pawn that dies outright, like before; turn
+  on for one that goes down instead, with an optional bleed-out timer.
+- **Initial Resources** — secondary pools beyond Max Vital, such as mana or
+  stamina, registered full on every spawn.
 
 ## 2 — Build the prefab
 
@@ -74,10 +79,13 @@ says which. `Possess` swaps instead of refusing.
 float applied = pawn.ApplyDamage(new DamageInfo(25f, fireType, instigator: dragon));
 pawn.Heal(10f);                       // living pawns only
 pawn.Kill(new DeathInfo(instigator: scriptedTrap));   // ignores invulnerability
-pawn.TryRevive(new ReviveInfo(0.5f)); // back at half vitals
+pawn.TryRevive(new ReviveInfo(0.5f)); // back at half vitals — recovers Dead or Incapacitated
 ```
 
-Healing a corpse does nothing. Revival is `TryRevive` and nothing else.
+Healing a corpse (or a downed pawn) does nothing. Revival is `TryRevive` and
+nothing else. If **Can Be Incapacitated** is on, that first fatal blow downs the
+pawn instead of killing it — `pawn.State` becomes `Incapacitated`, not `Dead` —
+and any further hit, `Kill()`, or a bleed-out timer finishes it.
 
 ## 6 — Drive the clock
 
@@ -89,8 +97,9 @@ void Update() => pawn.Tick(Time.deltaTime);
 void EndRound() => pawn.Tick(1f);
 ```
 
-`Tick` advances timed state — today, the invulnerability grace period. A
-`PawnSpawner` needs the same call to advance pending respawns.
+`Tick` advances timed state — the invulnerability grace period, and a downed
+pawn's bleed-out timer if it has one. A `PawnSpawner` needs the same call to
+advance pending respawns.
 
 ## 7 — Spawn and respawn a population
 

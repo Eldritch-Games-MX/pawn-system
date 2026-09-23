@@ -22,26 +22,34 @@ refuses to know anything else about your game.
    `Tick(float amount)` — once per frame, once per round, or never.
 5. **Transactional state changes.** All validation happens before any mutation.
    A call that returns a failure code has changed nothing and raised no events.
-6. **Zero package dependencies in the core.** Input and abilities are optional
-   adapter assemblies that drop out of the build when their packages are absent.
+6. **Zero package dependencies in the core.** Input, abilities and interaction
+   are optional adapter assemblies that drop out of the build when their
+   packages are absent.
 
 ## What a pawn owns
 
 | Concern | Type | Notes |
 |---|---|---|
 | Identity | `PawnDefinition`, `PawnTag`, `TeamDefinition` | Authored once, shared by every instance of an archetype |
-| Lifecycle | `PawnState`, `Spawn` / `Despawn` / `Kill` / `TryRevive` | One state at a time, every transition through a method |
+| Lifecycle | `PawnState`, `Spawn` / `Despawn` / `Kill` / `TryRevive` | One state at a time, every transition through a method; `Incapacitated` is an opt-in extra step between `Alive` and `Dead` |
 | Possession | `IPawnPossessor`, `TryPossess` / `Possess` / `Release` | One driver at a time, player or AI |
 | Vitals | `IVitalSource`, `Health`, `DamageInfo`, `IDamageModifier` | A clamped number plus a damage pipeline |
+| Resources | `ResourceDefinition`, `PawnResourcePool` | Any number of secondary pools that never kill the pawn |
 | Movement | `IPawnMotor`, `CharacterControllerMotor` | Entirely optional |
 | Services | `PawnRegistry`, `PawnSpawner`, `IRespawnPolicy`, `IPawnPool` | Queryable population, spawning and respawning |
 | Persistence | `CaptureState` / `RestoreState`, `PawnSaveData` | Opt-in extension methods |
 
 ## Non-goals
 
-Input binding, abilities and effects, interaction, inventory, animation, AI
-behaviour, cameras, and networking. Each of those is another package or game
-code; the pawn exposes capabilities so they can reach it.
+Input binding, abilities and effects, inventory, AI behaviour, and cameras
+remain out of scope entirely — each is another package or game code, and the
+pawn exposes capabilities so they can reach it. Two things get the narrowest
+possible seam rather than a flat "no": **animation** is one optional
+MonoBehaviour (`AnimatorPawnBridge`) that wires lifecycle events onto an
+`Animator` by parameter name — not an animation system — and **networking**
+is a data-only marker (`IPawnAuthority`) a netcode adapter can read — not an
+enforcement mechanism or a netcode integration. Neither pulls in a dependency
+or makes a policy decision the game did not make itself.
 
 ## Where to go next
 

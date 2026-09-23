@@ -231,6 +231,26 @@ namespace EldritchGames.PawnSystem.Lifecycle
             for (int i = 0; i < initialSpawnCount; i++) Spawn();
         }
 
+        /// <summary>
+        /// Draws a marker and a facing ray at each configured spawn point when this spawner is
+        /// selected. Scene-view only — <see cref="Gizmos"/> calls are no-ops outside the Editor, so
+        /// this never runs in a player build.
+        /// </summary>
+        private void OnDrawGizmosSelected()
+        {
+            if (spawnPoints == null) return;
+
+            Gizmos.color = new Color(0.2f, 0.85f, 0.4f, 0.9f);
+            for (int i = 0; i < spawnPoints.Count; i++)
+            {
+                Transform point = spawnPoints[i];
+                if (point == null) continue;
+
+                Gizmos.DrawWireSphere(point.position, 0.35f);
+                Gizmos.DrawRay(point.position, point.forward * 0.75f);
+            }
+        }
+
         private void Respawn(Pawn pawn)
         {
             if (pawn == null) return;

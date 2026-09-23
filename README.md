@@ -11,9 +11,10 @@ brain are both `IPawnPossessor`, and the pawn cannot tell which one is driving
 it. That is what makes a body swappable mid-game.
 
 The core has **no package dependencies** — not on input, not on abilities, not on
-interaction. Two optional adapter assemblies bridge it to the Eldritch Input
-System (possession by a player) and the Eldritch Ability System (vitals backed by
-an attribute), and each drops out of the build when its package is absent.
+interaction. Three optional adapter assemblies bridge it to the Eldritch Input
+System (possession by a player), the Eldritch Ability System (vitals backed by
+an attribute) and the Eldritch Interaction System (a pawn as an interaction
+target), and each drops out of the build when its package is absent.
 
 See `Documentation~/index.md` for the full guide, `Documentation~/architecture.md`
 for how the pieces fit together, `Documentation~/pawn-taxonomy.md` for how common
@@ -72,6 +73,31 @@ pawn.Died += (dead, info) =>
 
 pawn.Heal(10f);                        // no-op on a dead pawn — healing never revives
 pawn.TryRevive(new ReviveInfo(0.5f));  // back at half vitals, with a fresh grace period
+```
+
+### Downing instead of killing
+
+```csharp
+// on the definition: Can Be Incapacitated = true, Incapacitation Duration = 8
+
+pawn.Incapacitated += (downed, info) => ShowDownedUI(downed);
+
+pawn.ApplyDamage(fatalBlow);          // State becomes Incapacitated, not Dead
+pawn.ApplyDamage(anotherHit);         // any further hit finishes it — State becomes Dead
+
+// or a teammate gets there first
+pawn.TryRevive(ReviveInfo.Full);      // the same call recovers a downed pawn or a corpse
+
+void Update() => pawn.Tick(Time.deltaTime);   // counts down the bleed-out timer, if any
+```
+
+### Secondary resources
+
+```csharp
+// on the definition: Initial Resources = [ mana ]
+
+pawn.Resources.ApplyDelta(mana, -15f);           // cast a spell
+if (pawn.Resources.GetCurrent(mana) >= cost) { /* can afford it */ }
 ```
 
 ### Teams and relationships
@@ -137,6 +163,39 @@ pawn.SetVitalSource(new AttributeVitalSource(abilitySystemComponent, healthAttri
 // or wire it from the inspector with AbilityVitalsBinder
 ```
 
+### Interaction System adapter (optional)
+
+```csharp
+// on the pawn's GameObject, alongside Pawn:
+//   PawnInteractable
+
+// a game-defined capability, added the same way as on a plain Interactable
+public sealed class LootableCorpse : MonoBehaviour, ICollectible
+{
+    [SerializeField] private Pawn pawn;
+    public bool TryCollect() => pawn.State == PawnState.Dead;
+}
+```
+
+### Networked ownership (marker only)
+
+```csharp
+pawn.Authority = new NetcodePawnAuthority(networkObject);   // your own thin IPawnAuthority
+
+if (pawn.HasAuthority) pawn.ApplyDamage(damage);   // the game checks it; the package never does
+```
+
+### Animator bridge
+
+```csharp
+// on the pawn's GameObject, alongside Pawn and Animator:
+//   AnimatorPawnBridge
+//     Speed Parameter    = "Speed"
+//     Grounded Parameter = "IsGrounded"
+//     Died Trigger       = "Died"
+//     Hit Trigger        = ""   // this controller has no hit reaction — left blank, skipped
+```
+
 ## API reference
 
 The full surface is documented with XML comments in the source (IntelliSense/
@@ -147,33 +206,36 @@ IDE tooltips) and in `Documentation~/architecture.md`; this is the map.
 | Member | Description |
 |---|---|
 | `Definition` | The `PawnDefinition` this pawn was built from |
-| `State` | `Unspawned` / `Alive` / `Dead` / `Despawned` |
-| `IsAlive` | Shorthand for `State == Alive` |
+| `State` | `Unspawned` / `Alive` / `Dead` / `Despawned` / `Incapacitated` |
+| `IsAlive` / `IsIncapacitated` | Shorthand for `State == Alive` / `State == Incapacitated` |
 | `Tags` | Runtime `PawnTagContainer`, seeded from the definition |
 | `Team` | Current `TeamDefinition`, freely reassignable |
 | `TeamResolver` | `ITeamResolver` used by `RelationshipTo` |
 | `ViewPoint` | Eyes/aim `Transform`, falls back to the pawn's own transform |
 | `Vitals` | The `IVitalSource` backing health/hull/sanity/etc. |
+| `Resources` | Secondary `PawnResourcePool` — mana, stamina, anything that doesn't kill the pawn |
 | `Motor` | The `IPawnMotor` found on this GameObject, or `null` |
 | `CurrentPossessor` / `IsPossessed` | Whoever is currently driving the pawn |
+| `Authority` / `HasAuthority` | Networked-ownership marker; `null`/`true` by default, never enforced by the package |
 | `IsInvulnerable` / `InvulnerabilityRemaining` | Damage-immunity state |
+| `IncapacitationRemaining` | Seconds before a downed pawn bleeds out, or zero |
 | `Spawn()` / `Spawn(position, rotation)` | → `SpawnResult` |
 | `Despawn()` | Takes the pawn out of play (releases possessor, deactivates GameObject) |
 | `TryPossess(possessor)` | → `PossessionResult`; fails if already possessed |
 | `Possess(possessor)` | Swaps possessor, releasing the previous one first |
 | `Release()` | Clears the current possessor |
-| `ApplyDamage(in DamageInfo)` | → amount actually applied, after modifiers/invulnerability |
-| `Heal(amount)` | No-op while dead |
-| `Kill(DeathInfo)` | Forces death, bypassing invulnerability |
-| `TryRevive(ReviveInfo)` | → `ReviveResult`; only way to bring a dead pawn back |
+| `ApplyDamage(in DamageInfo)` | → amount actually applied, after modifiers/invulnerability; downs an incapacitation-capable pawn instead of killing it on a fatal blow |
+| `Heal(amount)` | No-op while dead or incapacitated |
+| `Kill(DeathInfo)` | Forces death, bypassing invulnerability and incapacitation — always straight to `Dead` |
+| `TryRevive(ReviveInfo)` | → `ReviveResult`; recovers a dead **or** incapacitated pawn back to `Alive` |
 | `SetInvulnerable(bool)` / `SetInvulnerable(duration)` | Indefinite or timed immunity |
-| `Tick(amount)` | Advances timed state (invulnerability, etc.) — call once per frame or round |
+| `Tick(amount)` | Advances timed state (invulnerability, bleed-out) — call once per frame or round |
 | `TryGet<T>(out capability)` | Capability lookup, same shape as the Input/Interaction systems |
 | `RelationshipTo` / `IsHostileTo` / `IsFriendlyTo` | Team relationship queries |
 | `SetVitalSource(IVitalSource)` | Replaces the vitals backing (e.g. `AttributeVitalSource`) |
 | `SetMotor(IPawnMotor)` | Overrides motor discovery |
 | `RefreshComponentModifiers()` | Re-scans `IDamageModifier` components after adding/removing one |
-| `Spawned`, `Despawned`, `Revived`, `DamageTaken`, `Died`, `Possessed`, `Released` | Events |
+| `Spawned`, `Despawned`, `Revived`, `DamageTaken`, `Died`, `Incapacitated`, `Possessed`, `Released` | Events |
 
 ### Identity
 
@@ -195,6 +257,8 @@ IDE tooltips) and in `Documentation~/architecture.md`; this is the map.
 | `DamageReceiver` | Per-collider hit zone with a multiplier and body-part tag |
 | `DeathInfo` / `ReviveInfo` | Structured death/revive payloads |
 | `IDamageable` | Implemented by `Pawn`; targetable by weapons/traps generically |
+| `ResourceDefinition` (SO) | An authored secondary resource — mana, stamina, ammunition |
+| `PawnResourcePool` | A pawn's registered resources; `Register`/`ApplyDelta`/`SetMax`/`Fill` per resource |
 
 ### Movement
 
@@ -203,12 +267,19 @@ IDE tooltips) and in `Documentation~/architecture.md`; this is the map.
 | `IPawnMotor` | Move/Look/Teleport/Stop contract — entirely optional |
 | `CharacterControllerMotor` | Built-in `IPawnMotor` over Unity's `CharacterController` |
 
-### Possession
+### Animation
+
+| Type | Purpose |
+|---|---|
+| `AnimatorPawnBridge` | Drives an `Animator` by parameter name from the pawn's lifecycle events and motor state; every parameter is optional |
+
+### Possession & networking
 
 | Type | Purpose |
 |---|---|
 | `IPawnPossessor` | `OnPossessed` / `OnReleased` — implemented by players and AI alike |
-| `PossessionResult` | `Success` / `AlreadyPossessed` / `NotSpawned` / `PawnDead` / `AlreadyOwner` |
+| `PossessionResult` | `Success` / `AlreadyPossessed` / `NotSpawned` / `PawnDead` / `PawnIncapacitated` / `AlreadyOwner` |
+| `IPawnAuthority` | Networked-ownership marker read by `Pawn.HasAuthority`; the package never enforces it itself |
 
 ### Lifecycle services
 
@@ -224,7 +295,8 @@ IDE tooltips) and in `Documentation~/architecture.md`; this is the map.
 
 | Type | Purpose |
 |---|---|
-| `PawnSaveData` | Serializable snapshot of a pawn's state |
+| `PawnSaveData` | Serializable snapshot of a pawn's state, including registered resources; `CurrentSchemaVersion` for future migrations |
+| `ResourceSaveData` / `IResourceLookup` | Saved resource pools and how to resolve them back to assets, mirroring `ITeamLookup` |
 | `CaptureState()` / `RestoreState()` | Extension methods on `Pawn` |
 
 ### Optional adapters
@@ -235,11 +307,22 @@ IDE tooltips) and in `Documentation~/architecture.md`; this is the map.
 | | `PawnInputTarget` | Forwards `ICommand`s into a pawn's capabilities |
 | `EldritchGames.PawnSystem.AbilitySystem` | `AttributeVitalSource` | `IVitalSource` backed by an `AbilitySystemComponent` attribute |
 | | `AbilityVitalsBinder` | Inspector-driven wiring for the above |
+| `EldritchGames.PawnSystem.InteractionSystem` | `PawnInteractable` | Makes a pawn an `IInteractable`, forwarding capability queries to `Pawn.TryGet<T>` |
+
+### Editor tooling
+
+| Tool | Purpose |
+|---|---|
+| **Eldritch Games > Pawn System > Pawn Monitor** | Live Play Mode dashboard of every pawn in the open scenes — state, team, vitals bar, possessor, Kill/Revive/Despawn debug buttons |
+| **Eldritch Games > Pawn System > Validate Pawn Definitions** | Project-wide sweep for authoring mistakes |
+| `PawnSpawner` gizmos | Configured spawn points draw as a marker + facing ray when the spawner is selected |
+| `PawnDefinition` inspector | Icon header, grouped foldouts, inline validation |
 
 ## Package layout
 
-- `Runtime/` — the core (no dependencies beyond UnityEngine), plus the
-  `InputSystem/` and `AbilitySystem/` adapter assemblies.
-- `Editor/` — the `[SerializeReference]` picker, the `PawnDefinition` inspector,
-  and the definition validator.
+- `Runtime/` — the core (no dependencies beyond UnityEngine, including
+  `Animation/` for the Animator bridge), plus the `InputSystem/`,
+  `AbilitySystem/` and `InteractionSystem/` adapter assemblies.
+- `Editor/` — the `[SerializeReference]` picker, the `PawnDefinition` inspector
+  and validator, and the `Windows/` Pawn Monitor.
 - `Tests/EditMode` and `Tests/PlayMode` — the automated test suite.

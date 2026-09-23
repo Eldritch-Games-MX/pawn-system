@@ -62,8 +62,14 @@ namespace EldritchGames.PawnSystem.Editor
                 issues.Add(new Issue("Spawn Invulnerability is negative. Use zero to disable the grace period."));
             }
 
+            if (definition.IncapacitationDuration < 0f)
+            {
+                issues.Add(new Issue("Incapacitation Duration is negative. Use zero to disable the bleed-out timer."));
+            }
+
             CheckTags(definition, issues);
             CheckModifiers(definition, issues);
+            CheckResources(definition, issues);
 
             return issues;
         }
@@ -99,6 +105,28 @@ namespace EldritchGames.PawnSystem.Editor
                 if (modifiers[i] == null)
                 {
                     issues.Add(new Issue($"Damage Modifier {i} is empty. Pick a type from the dropdown or remove the entry."));
+                }
+            }
+        }
+
+        private static void CheckResources(PawnDefinition definition, List<Issue> issues)
+        {
+            IReadOnlyList<Vitals.ResourceDefinition> resources = definition.InitialResources;
+            var seen = new HashSet<Vitals.ResourceDefinition>();
+
+            for (int i = 0; i < resources.Count; i++)
+            {
+                Vitals.ResourceDefinition resource = resources[i];
+
+                if (resource == null)
+                {
+                    issues.Add(new Issue($"Initial Resource {i} is empty. Assign a Resource Definition or remove the entry."));
+                    continue;
+                }
+
+                if (!seen.Add(resource))
+                {
+                    issues.Add(new Issue($"Resource '{resource.name}' is listed more than once. The duplicate has no effect."));
                 }
             }
         }

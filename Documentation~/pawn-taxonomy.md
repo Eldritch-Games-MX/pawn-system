@@ -23,6 +23,11 @@ adding anything to the core.
 | **Mind-controlled enemy** | — | — | Player possessor swapped in | Also assign `pawn.Team` to flip its allegiance |
 | **Invulnerable escort NPC** | — | — | AI | `pawn.SetInvulnerable(true)`; scripted deaths still land via a damage type that ignores invulnerability |
 | **Ability-driven RPG character** | Max Vital ignored | `AbilitySystemComponent`, `AbilityVitalsBinder` | Either | Vitals are an attribute, so costs, effects and damage move one number |
+| **Downable shooter player** | `CanBeIncapacitated`, `IncapacitationDuration` for a bleed-out timer | `CharacterControllerMotor`, `PawnInputTarget` | Same possessor throughout | A fatal blow downs, not kills; a teammate's `TryRevive` picks them back up |
+| **Spellcaster with mana** | `InitialResources = [ mana ]` | Whatever else the archetype needs | Either | `pawn.Resources.ApplyDelta(mana, -cost)` before casting |
+| **Networked co-op character** | Same as any player character | `PawnInputTarget` | `ControllerPossessor` | `pawn.Authority = new NetcodePawnAuthority(...)`; the game checks `HasAuthority` before calling `ApplyDamage`/`TryPossess` locally |
+| **Animated 3D character** | Any of the above | `AnimatorPawnBridge` alongside `Animator` | Any | Name the parameters that exist on the controller; leave the rest blank |
+| **Lootable NPC corpse** | Any | `PawnInteractable`, a game-defined `ICollectible` that reads `pawn.State` | Any while alive | Dying does not change which components are on the GameObject — the capability itself decides when it applies |
 
 ## Things that are tags, not features
 

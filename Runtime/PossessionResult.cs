@@ -23,6 +23,9 @@ namespace EldritchGames.PawnSystem
         PawnDead = 3,
 
         /// <summary>The possessor already holds this pawn. Nothing changed and no events were raised.</summary>
-        AlreadyOwner = 4
+        AlreadyOwner = 4,
+
+        /// <summary>The pawn is <see cref="PawnState.Incapacitated"/>. Revive it first, or possess a different body.</summary>
+        PawnIncapacitated = 5
     }
 }

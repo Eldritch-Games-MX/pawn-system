@@ -58,6 +58,20 @@ namespace EldritchGames.PawnSystem.Identity
         [Tooltip("Deactivate the GameObject when this pawn despawns. Turn off when something else handles the visuals.")]
         [SerializeField] private bool deactivateOnDespawn = true;
 
+        [Header("Incapacitation")]
+        [Tooltip("Allow this pawn to be downed instead of killed outright by a fatal blow. Off by default — a fatal blow kills as before.")]
+        [SerializeField] private bool canBeIncapacitated;
+
+        [Tooltip("Seconds a downed pawn survives before it bleeds out and dies on its own. Zero or less disables the timer — it stays down until finished off or revived.")]
+        [SerializeField] private float incapacitationDuration;
+
+        [Tooltip("Release the possessor automatically when this pawn is downed. Off by default — most games let a downed player keep crawling or calling for help.")]
+        [SerializeField] private bool releaseOnIncapacitation;
+
+        [Header("Resources")]
+        [Tooltip("Secondary resource pools this pawn starts with beyond its vitals — mana, stamina, ammunition.")]
+        [SerializeField] private List<ResourceDefinition> initialResources = new List<ResourceDefinition>();
+
         /// <summary>Stable identifier used by save data to resolve this asset. Never shown to players.</summary>
         public string Id => id;
 
@@ -93,5 +107,17 @@ namespace EldritchGames.PawnSystem.Identity
 
         /// <summary>Whether <see cref="Pawn.Despawn"/> deactivates the GameObject.</summary>
         public bool DeactivateOnDespawn => deactivateOnDespawn;
+
+        /// <summary>Whether a fatal blow downs this pawn (<see cref="PawnState.Incapacitated"/>) instead of killing it outright.</summary>
+        public bool CanBeIncapacitated => canBeIncapacitated;
+
+        /// <summary>Seconds a downed pawn survives before bleeding out. Zero or less disables the timer.</summary>
+        public float IncapacitationDuration => incapacitationDuration;
+
+        /// <summary>Whether being downed automatically releases the possessor.</summary>
+        public bool ReleaseOnIncapacitation => releaseOnIncapacitation;
+
+        /// <summary>Secondary resource pools a pawn of this kind starts with. Registered full on spawn.</summary>
+        public IReadOnlyList<ResourceDefinition> InitialResources => initialResources;
     }
 }

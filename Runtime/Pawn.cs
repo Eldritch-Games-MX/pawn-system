@@ -52,12 +52,17 @@ namespace EldritchGames.PawnSystem
         private readonly PawnTagContainer tags = new PawnTagContainer();
         private readonly List<IDamageModifier> componentModifiers = new List<IDamageModifier>();
 
+        private readonly PawnResourcePool resources = new PawnResourcePool();
+
         private IVitalSource vitals;
         private IPawnMotor motor;
         private ITeamResolver teamResolver = new DefaultTeamResolver();
+        private IPawnAuthority authority;
         private float invulnerabilityRemaining;
         private bool invulnerableIndefinitely;
         private bool applyingDamage;
+        private float incapacitationRemaining;
+        private DeathInfo incapacitationCause;
 
         /// <summary>The authored recipe this pawn was built from, or <c>null</c> when none is assigned.</summary>
         public PawnDefinition Definition => definition;
@@ -67,6 +72,9 @@ namespace EldritchGames.PawnSystem
 
         /// <summary><c>true</c> when the pawn is in play and not dead — the only state in which it can act or be hurt.</summary>
         public bool IsAlive => State == PawnState.Alive;
+
+        /// <summary><c>true</c> when the pawn is downed but not dead. See <see cref="PawnState.Incapacitated"/>.</summary>
+        public bool IsIncapacitated => State == PawnState.Incapacitated;
 
         /// <summary>The pawn's runtime tags, seeded from <see cref="PawnDefinition.Tags"/> when it spawns.</summary>
         public PawnTagContainer Tags => tags;
@@ -111,11 +119,36 @@ namespace EldritchGames.PawnSystem
         /// <remarks>Movement is entirely optional — a turn-based portrait or a turret is a pawn with no motor.</remarks>
         public IPawnMotor Motor => motor ??= GetComponentInChildren<IPawnMotor>(true);
 
+        /// <summary>
+        /// Secondary resource pools beyond <see cref="Vitals"/> — mana, stamina, ammunition,
+        /// whatever a game wants that is not the number the pawn dies when it runs out of. Empty
+        /// until something registers a resource, either from <see cref="PawnDefinition.InitialResources"/>
+        /// on spawn or by calling <see cref="PawnResourcePool.Register(ResourceDefinition)"/> directly.
+        /// </summary>
+        public PawnResourcePool Resources => resources;
+
         /// <summary>Whoever is currently driving this pawn, or <c>null</c> when nothing is.</summary>
         public IPawnPossessor CurrentPossessor { get; private set; }
 
         /// <summary><c>true</c> when something is currently driving this pawn.</summary>
         public bool IsPossessed => CurrentPossessor != null;
+
+        /// <summary>
+        /// Marks who is authoritative over this pawn in a networked game. <c>null</c> — the
+        /// default — means no networking layer is involved.
+        /// </summary>
+        /// <remarks>
+        /// A data-only marker; nothing in this package reads it before acting. See
+        /// <see cref="IPawnAuthority"/> for how a networked adapter is expected to use it.
+        /// </remarks>
+        public IPawnAuthority Authority
+        {
+            get => authority;
+            set => authority = value;
+        }
+
+        /// <summary>Whether the current caller is authoritative over this pawn. <c>true</c> whenever <see cref="Authority"/> is unset.</summary>
+        public bool HasAuthority => authority == null || authority.HasAuthority;
 
         /// <summary>
         /// <c>true</c> while damage is being ignored — during a spawn or revival grace period, or
@@ -129,6 +162,12 @@ namespace EldritchGames.PawnSystem
 
         /// <summary>Seconds of grace remaining, or zero when the pawn is not on a timed invulnerability.</summary>
         public float InvulnerabilityRemaining => invulnerabilityRemaining;
+
+        /// <summary>
+        /// Seconds before a downed pawn bleeds out, or zero when the pawn is not incapacitated or
+        /// has no bleed-out timer. Drive a bleed-out UI bar from this.
+        /// </summary>
+        public float IncapacitationRemaining => incapacitationRemaining;
 
         /// <summary>Raised after the pawn enters play and is <see cref="PawnState.Alive"/>.</summary>
         public event Action<Pawn> Spawned;
@@ -151,6 +190,14 @@ namespace EldritchGames.PawnSystem
         /// </summary>
         public event Action<Pawn, DeathInfo> Died;
 
+        /// <summary>
+        /// Raised when a fatal blow downs an incapacitation-capable pawn instead of killing it —
+        /// see <see cref="PawnState.Incapacitated"/>. The pawn is still addressable;
+        /// <see cref="TryRevive"/> also recovers an incapacitated pawn back to
+        /// <see cref="PawnState.Alive"/>.
+        /// </summary>
+        public event Action<Pawn, DeathInfo> Incapacitated;
+
         /// <summary>Raised after a possessor takes this pawn.</summary>
         public event Action<Pawn, IPawnPossessor> Possessed;
 
@@ -163,8 +210,9 @@ namespace EldritchGames.PawnSystem
 
         /// <summary>
         /// Brings the pawn into play at <paramref name="position"/>: reactivates the GameObject,
-        /// resets team and tags from the definition, fills vitals, grants the spawn grace period,
-        /// and raises <see cref="Spawned"/>.
+        /// resets team and tags from the definition, fills vitals, registers or refills
+        /// <see cref="PawnDefinition.InitialResources"/>, grants the spawn grace period, and
+        /// raises <see cref="Spawned"/>.
         /// </summary>
         /// <param name="position">Where to place the pawn.</param>
         /// <param name="rotation">Which way to face it.</param>
@@ -179,7 +227,7 @@ namespace EldritchGames.PawnSystem
         /// </remarks>
         public SpawnResult Spawn(Vector3 position, Quaternion rotation)
         {
-            if (State == PawnState.Alive || State == PawnState.Dead) return SpawnResult.AlreadySpawned;
+            if (State == PawnState.Alive || State == PawnState.Dead || State == PawnState.Incapacitated) return SpawnResult.AlreadySpawned;
             if (definition == null && vitals == null) return SpawnResult.MissingDefinition;
 
             gameObject.SetActive(true);
@@ -193,6 +241,13 @@ namespace EldritchGames.PawnSystem
                 Team = definition.Team;
                 IReadOnlyList<PawnTag> authored = definition.Tags;
                 for (int i = 0; i < authored.Count; i++) tags.Add(authored[i]);
+
+                IReadOnlyList<ResourceDefinition> initialResources = definition.InitialResources;
+                for (int i = 0; i < initialResources.Count; i++)
+                {
+                    ResourceDefinition resourceDefinition = initialResources[i];
+                    if (resourceDefinition != null) resources.RegisterOrRefill(resourceDefinition);
+                }
             }
 
             Vitals.Fill(1f);
@@ -200,6 +255,7 @@ namespace EldritchGames.PawnSystem
 
             invulnerableIndefinitely = false;
             invulnerabilityRemaining = definition != null ? Mathf.Max(0f, definition.SpawnInvulnerability) : 0f;
+            incapacitationRemaining = 0f;
 
             State = PawnState.Alive;
             Spawned?.Invoke(this);
@@ -222,6 +278,7 @@ namespace EldritchGames.PawnSystem
             State = PawnState.Despawned;
             invulnerableIndefinitely = false;
             invulnerabilityRemaining = 0f;
+            incapacitationRemaining = 0f;
 
             if (definition == null || definition.DeactivateOnDespawn) gameObject.SetActive(false);
 
@@ -247,6 +304,7 @@ namespace EldritchGames.PawnSystem
             if (ReferenceEquals(CurrentPossessor, possessor)) return PossessionResult.AlreadyOwner;
             if (State == PawnState.Unspawned || State == PawnState.Despawned) return PossessionResult.NotSpawned;
             if (State == PawnState.Dead) return PossessionResult.PawnDead;
+            if (State == PawnState.Incapacitated) return PossessionResult.PawnIncapacitated;
             if (CurrentPossessor != null) return PossessionResult.AlreadyPossessed;
 
             CurrentPossessor = possessor;
@@ -281,6 +339,7 @@ namespace EldritchGames.PawnSystem
             if (ReferenceEquals(CurrentPossessor, possessor)) return PossessionResult.AlreadyOwner;
             if (State == PawnState.Unspawned || State == PawnState.Despawned) return PossessionResult.NotSpawned;
             if (State == PawnState.Dead) return PossessionResult.PawnDead;
+            if (State == PawnState.Incapacitated) return PossessionResult.PawnIncapacitated;
 
             ReleaseInternal();
             return TryPossess(possessor);
@@ -297,16 +356,34 @@ namespace EldritchGames.PawnSystem
         /// the pawn's vitals, and kills the pawn when they reach zero.
         /// </summary>
         /// <param name="damage">The incoming damage event.</param>
-        /// <returns>How much was actually removed. Zero when the pawn is not alive, the amount was not positive, the pawn is invulnerable, or modifiers absorbed it all.</returns>
+        /// <returns>How much was actually removed. Zero when the pawn cannot take damage right now, the amount was not positive, the pawn is invulnerable, or modifiers absorbed it all.</returns>
         /// <remarks>
-        /// Order: alive check, positive-amount check, invulnerability check, definition modifiers
+        /// Order: state check, positive-amount check, invulnerability check, definition modifiers
         /// top to bottom, then <see cref="IDamageModifier"/> components in component order, then the
-        /// vitals change, then <see cref="DamageTaken"/>, then <see cref="Died"/> if this was fatal.
-        /// A hit absorbed to zero still raises <see cref="DamageTaken"/> so hit reactions and
-        /// "blocked!" feedback still fire.
+        /// vitals change, then <see cref="DamageTaken"/>, then <see cref="Died"/> or
+        /// <see cref="Incapacitated"/> if this was fatal. A hit absorbed to zero still raises
+        /// <see cref="DamageTaken"/> so hit reactions and "blocked!" feedback still fire.
+        /// <para>
+        /// A pawn that is already <see cref="PawnState.Incapacitated"/> takes a shortcut: any
+        /// qualifying hit (respecting invulnerability, skipping the modifier pipeline — armor does
+        /// not save a downed target) finishes it straight to <see cref="PawnState.Dead"/>. Only a
+        /// pawn whose <see cref="PawnDefinition.CanBeIncapacitated"/> is set ever reaches
+        /// <see cref="PawnState.Incapacitated"/> in the first place; everyone else dies on the
+        /// first fatal blow exactly as before.
+        /// </para>
         /// </remarks>
         public float ApplyDamage(in DamageInfo damage)
         {
+            if (State == PawnState.Incapacitated)
+            {
+                if (damage.Amount <= 0f) return 0f;
+                if (IsInvulnerable && !damage.IgnoresInvulnerability) return 0f;
+
+                DamageTaken?.Invoke(this, damage);
+                Die(DeathInfo.FromDamage(damage));
+                return 0f;
+            }
+
             if (!IsAlive) return 0f;
             if (damage.Amount <= 0f) return 0f;
             if (IsInvulnerable && !damage.IgnoresInvulnerability) return 0f;
@@ -325,7 +402,11 @@ namespace EldritchGames.PawnSystem
             DamageTaken?.Invoke(this, modified);
 
             if (Vitals.IsDepleted)
-                Die(DeathInfo.FromDamage(modified, modified.Amount - applied));
+            {
+                DeathInfo info = DeathInfo.FromDamage(modified, modified.Amount - applied);
+                if (definition != null && definition.CanBeIncapacitated) Incapacitate(info);
+                else Die(info);
+            }
 
             return applied;
         }
@@ -334,8 +415,9 @@ namespace EldritchGames.PawnSystem
         /// <param name="amount">How much to restore. Zero or negative values are ignored.</param>
         /// <returns>How much was actually restored after clamping at the maximum.</returns>
         /// <remarks>
-        /// Healing a dead pawn does nothing — deliberately, so a stray area-of-effect heal can never
-        /// resurrect a corpse. Revival is <see cref="TryRevive"/> and nothing else.
+        /// Healing a dead or incapacitated pawn does nothing — deliberately, so a stray
+        /// area-of-effect heal can never resurrect a corpse or pick a downed teammate back up.
+        /// Recovery is <see cref="TryRevive"/> and nothing else.
         /// </remarks>
         public float Heal(float amount)
         {
@@ -350,36 +432,50 @@ namespace EldritchGames.PawnSystem
         /// <remarks>
         /// For scripted deaths, execution moves and falling out of the world. Drains vitals to zero
         /// first, so anything watching <see cref="IVitalSource.Changed"/> sees a consistent pawn.
-        /// No-ops unless the pawn is alive.
+        /// Always goes straight to <see cref="PawnState.Dead"/> — unlike <see cref="ApplyDamage"/>,
+        /// <c>Kill</c> never routes through <see cref="PawnState.Incapacitated"/>, whether it is
+        /// called on a living pawn or to finish off one already downed. No-ops unless the pawn is
+        /// alive or incapacitated.
         /// </remarks>
         public void Kill(DeathInfo info = default)
         {
-            if (!IsAlive) return;
+            if (State != PawnState.Alive && State != PawnState.Incapacitated) return;
 
-            applyingDamage = true;
-            Vitals.ApplyDelta(-Vitals.Current);
-            applyingDamage = false;
+            if (State == PawnState.Alive)
+            {
+                applyingDamage = true;
+                Vitals.ApplyDelta(-Vitals.Current);
+                applyingDamage = false;
+            }
 
             Die(info);
         }
 
         /// <summary>
-        /// Brings a dead pawn back with part or all of its vitals and a fresh grace period.
+        /// Brings a dead or incapacitated pawn back with part or all of its vitals and a fresh
+        /// grace period.
         /// </summary>
         /// <param name="info">How much to restore, who did it, and how long the grace period lasts.</param>
         /// <returns>
-        /// <see cref="ReviveResult.Success"/>, <see cref="ReviveResult.NotDead"/> for a living pawn,
-        /// or <see cref="ReviveResult.NotSpawned"/> for one that is not in play. Both failures change nothing.
+        /// <see cref="ReviveResult.Success"/>, <see cref="ReviveResult.NotDead"/> for a pawn that is
+        /// neither dead nor incapacitated, or <see cref="ReviveResult.NotSpawned"/> for one that is
+        /// not in play. Both failures change nothing.
         /// </returns>
+        /// <remarks>
+        /// One method recovers both a corpse and a downed pawn — from the pawn's own perspective
+        /// "come back to <see cref="PawnState.Alive"/>" is the same operation either way, so there
+        /// is no separate "pick up a downed teammate" API to learn.
+        /// </remarks>
         public ReviveResult TryRevive(ReviveInfo info)
         {
             if (State == PawnState.Unspawned || State == PawnState.Despawned) return ReviveResult.NotSpawned;
-            if (State != PawnState.Dead) return ReviveResult.NotDead;
+            if (State != PawnState.Dead && State != PawnState.Incapacitated) return ReviveResult.NotDead;
 
             float fraction = info.VitalFraction <= 0f ? 1f : Mathf.Clamp01(info.VitalFraction);
             Vitals.Fill(fraction);
 
             State = PawnState.Alive;
+            incapacitationRemaining = 0f;
 
             float grace = info.InvulnerabilityDuration < 0f
                 ? (definition != null ? definition.SpawnInvulnerability : 0f)
@@ -406,11 +502,24 @@ namespace EldritchGames.PawnSystem
         /// </summary>
         /// <param name="amount">Elapsed time — seconds, turns, whatever the game's clock counts.</param>
         /// <remarks>
-        /// The pawn has no <c>Update</c> of its own so the host stays in charge of time. Today this
-        /// advances the invulnerability grace period; possessors and capabilities tick themselves.
+        /// The pawn has no <c>Update</c> of its own so the host stays in charge of time. This
+        /// advances the invulnerability grace period and, for a downed pawn with a timed
+        /// <see cref="PawnDefinition.IncapacitationDuration"/>, the bleed-out clock — when it
+        /// reaches zero the pawn dies, carrying the cause of the original incapacitating blow.
+        /// Possessors and capabilities tick themselves.
         /// </remarks>
         public void Tick(float amount)
         {
+            if (State == PawnState.Incapacitated && incapacitationRemaining > 0f)
+            {
+                incapacitationRemaining = Mathf.Max(0f, incapacitationRemaining - amount);
+                if (incapacitationRemaining <= 0f)
+                {
+                    Die(incapacitationCause);
+                    return;
+                }
+            }
+
             if (invulnerabilityRemaining <= 0f) return;
             invulnerabilityRemaining = Mathf.Max(0f, invulnerabilityRemaining - amount);
         }
@@ -544,15 +653,39 @@ namespace EldritchGames.PawnSystem
 
         private void Die(in DeathInfo info)
         {
-            if (State != PawnState.Alive) return;
+            if (State != PawnState.Alive && State != PawnState.Incapacitated) return;
 
             State = PawnState.Dead;
             invulnerableIndefinitely = false;
             invulnerabilityRemaining = 0f;
+            incapacitationRemaining = 0f;
 
             if (definition == null || definition.ReleaseOnDeath) ReleaseInternal();
 
             Died?.Invoke(this, info);
+        }
+
+        /// <summary>
+        /// Downs the pawn straight to <see cref="PawnState.Incapacitated"/>, no-op unless it is
+        /// currently <see cref="PawnState.Alive"/>. Internal because the only callers are
+        /// <see cref="ApplyDamage"/>, <see cref="OnVitalsChanged"/>, and
+        /// <see cref="Persistence.PawnPersistence.RestoreState"/> restoring a saved incapacitated
+        /// pawn — everything else reaches this state through those, never directly.
+        /// </summary>
+        /// <param name="info">What to record as the cause.</param>
+        internal void Incapacitate(in DeathInfo info)
+        {
+            if (State != PawnState.Alive) return;
+
+            State = PawnState.Incapacitated;
+            invulnerableIndefinitely = false;
+            invulnerabilityRemaining = 0f;
+            incapacitationCause = info;
+            incapacitationRemaining = definition != null ? Mathf.Max(0f, definition.IncapacitationDuration) : 0f;
+
+            if (definition != null && definition.ReleaseOnIncapacitation) ReleaseInternal();
+
+            Incapacitated?.Invoke(this, info);
         }
 
         private void ReleaseInternal()
@@ -571,7 +704,8 @@ namespace EldritchGames.PawnSystem
             if (State != PawnState.Alive) return;
             if (current > 0f) return;
 
-            Die(default);
+            if (definition != null && definition.CanBeIncapacitated) Incapacitate(default);
+            else Die(default);
         }
     }
 }

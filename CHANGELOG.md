@@ -2,6 +2,17 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.2.0] - Unreleased
+
+### Added
+- `PawnState.Incapacitated`: a fatal blow downs a pawn whose `PawnDefinition.CanBeIncapacitated` is set instead of killing it outright. Any further qualifying hit, `Kill()`, or an optional `IncapacitationDuration` bleed-out timer finishes it into `Dead`; `TryRevive` recovers it back to `Alive` the same way it already recovered a corpse. Opt-in and additive — a pawn that never sets `CanBeIncapacitated` behaves exactly as before. New `Pawn.Incapacitated` event, `Pawn.IsIncapacitated` / `IncapacitationRemaining`, and `PossessionResult.PawnIncapacitated`.
+- `IPawnAuthority`: a data-only marker for networked ownership. `Pawn.Authority` / `Pawn.HasAuthority` exist so a netcode adapter can decide who is allowed to act on a pawn; the package itself never enforces it, staying engine- and netcode-agnostic.
+- Secondary resource pools: `ResourceDefinition` (mana, stamina, ammunition — anything that is not the number a pawn dies without), `PawnResourcePool` (reuses `Health` internally per pool), and `PawnDefinition.InitialResources` to register a pawn's resources full on every spawn.
+- `AnimatorPawnBridge`: wires a pawn's lifecycle events and motor state onto an `Animator` by parameter name, with every parameter optional so a controller only needs the ones it actually has. The one type in the package with an `Update()`, since Animator smoothing is a presentation concern tied to the render frame rather than the simulation clock.
+- Save data versioning: `PawnSaveData.schemaVersion` / `CurrentSchemaVersion`, the seam for future migrations. Persistence also now round-trips `PawnState.Incapacitated` and registered secondary resources (`ResourceSaveData`, `IResourceLookup`, mirroring `ITeamLookup`).
+- Optional `EldritchGames.PawnSystem.InteractionSystem` assembly: `PawnInteractable` makes a pawn discoverable by the Eldritch Interaction System, forwarding capability queries to the pawn's own `TryGet<T>` exactly like the other two adapters do for their systems. Guarded by the same `versionDefines` → `defineConstraints` pattern.
+- Editor: a **Pawn Monitor** window (`Eldritch Games > Pawn System > Pawn Monitor`) — a live Play Mode dashboard of every pawn in the open scenes, with state, team, a vitals bar, possessor, and Kill/Revive/Despawn debug buttons. `PawnSpawner` now draws its configured spawn points as gizmos (marker + facing ray) when selected. The `PawnDefinition` inspector and validator cover every new field.
+
 ## [0.1.0] - Unreleased
 
 ### Added

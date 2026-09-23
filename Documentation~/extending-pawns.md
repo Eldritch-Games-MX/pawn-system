@@ -128,6 +128,43 @@ pawn.SetVitalSource(new SquadVitalSource(squad));   // in Awake, before the pawn
 For an Ability System-backed pool, use the `AbilityVitalsBinder` component or
 `AttributeVitalSource` directly instead of writing your own.
 
+## Add a secondary resource
+
+No code at all, most of the time — create a `ResourceDefinition` asset (**Assets
+&gt; Create &gt; Eldritch Games &gt; Pawn System &gt; Resource Definition**), list
+it in the pawn's `Initial Resources`, and spend it:
+
+```csharp
+pawn.Resources.ApplyDelta(mana, -cost);
+if (pawn.Resources.GetCurrent(mana) >= cost) { /* can afford it */ }
+```
+
+Register one at runtime instead when it is not part of every pawn of an
+archetype — a temporary shield charge, a quest-specific counter:
+
+```csharp
+pawn.Resources.Register(shieldCharge, max: 3f);
+```
+
+## Mark networked ownership
+
+The package never checks authority itself — write a thin `IPawnAuthority` over
+whatever netcode you use and check it yourself before mutating a pawn:
+
+```csharp
+public sealed class NetcodePawnAuthority : IPawnAuthority
+{
+    private readonly NetworkObject networkObject;
+    public NetcodePawnAuthority(NetworkObject networkObject) => this.networkObject = networkObject;
+    public bool HasAuthority => networkObject.IsServer;
+}
+
+pawn.Authority = new NetcodePawnAuthority(networkObject);
+
+// in your own RPC handler or damage entry point:
+if (pawn.HasAuthority) pawn.ApplyDamage(damage);
+```
+
 ## Write a motor
 
 ```csharp

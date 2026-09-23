@@ -1,6 +1,6 @@
 {
   "name": "com.eldritchgames.pawnsystem",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "displayName": "Pawn System",
   "description": "Genre-agnostic pawn framework for Unity. A Pawn is any character in the world — player- or AI-driven — with identity, vitals, a movement seam, and a lifecycle covering spawn, death, revival, possession and release. The core has no input, ability or interaction dependency; optional adapter assemblies bridge it to the Eldritch Input System and Ability System.",
   "unity": "6000.3",

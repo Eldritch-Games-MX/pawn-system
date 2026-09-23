@@ -1,0 +1,25 @@
+{
+    "name": "EldritchGames.PawnSystem.InteractionSystem",
+    "rootNamespace": "EldritchGames.PawnSystem.InteractionSystem",
+    "references": [
+        "EldritchGames.PawnSystem",
+        "EldritchGames.InteractionSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "ELDRITCH_INTERACTIONSYSTEM"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.eldritchgames.interactionsystem",
+            "expression": "1.0.0",
+            "define": "ELDRITCH_INTERACTIONSYSTEM"
+        }
+    ],
+    "noEngineReferences": false
+}

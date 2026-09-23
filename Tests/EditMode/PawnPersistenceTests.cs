@@ -45,6 +45,66 @@ namespace EldritchGames.PawnSystem.Tests.EditMode
             Assert.AreEqual("players", data.teamId);
             Assert.AreEqual(new Vector3(1f, 2f, 3f), data.position);
             CollectionAssert.Contains(data.tags, "Status.Cursed");
+            Assert.AreEqual(PawnSaveData.CurrentSchemaVersion, data.schemaVersion);
+        }
+
+        [Test]
+        public void CaptureState_RecordsRegisteredResources()
+        {
+            ResourceDefinition mana = TestResources.Create("mana", defaultMax: 40f);
+            pawn.Spawn();
+            pawn.Resources.Register(mana);
+            pawn.Resources.ApplyDelta(mana, -15f);
+
+            PawnSaveData data = pawn.CaptureState();
+
+            Assert.AreEqual(1, data.resources.Length);
+            Assert.AreEqual("mana", data.resources[0].resourceId);
+            Assert.AreEqual(25f, data.resources[0].current, 0.0001f);
+            Assert.AreEqual(40f, data.resources[0].max, 0.0001f);
+        }
+
+        [Test]
+        public void RestoreState_RestoresResourcesOverridingWhatSpawnRegistered()
+        {
+            ResourceDefinition mana = TestResources.Create("mana", defaultMax: 40f);
+            PawnDefinition withMana = new PawnDefinitionBuilder().WithId("knight").WithMaxVital(100f).WithInitialResources(mana).Build();
+            pawn = TestPawns.Create(withMana);
+            pawn.Spawn();
+            pawn.Resources.ApplyDelta(mana, -30f);
+            PawnSaveData data = pawn.CaptureState();
+
+            Pawn loaded = TestPawns.Create(withMana, "Loaded");
+            try
+            {
+                loaded.RestoreState(data, resourceLookup: new TestResourceLookup(mana));
+
+                Assert.AreEqual(10f, loaded.Resources.GetCurrent(mana), 0.0001f,
+                    "Spawn already registered mana at full from the definition; restoring must override that with the saved value.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(loaded.gameObject);
+            }
+        }
+
+        [Test]
+        public void RestoreState_WithNoResourceLookup_SkipsResourcesWithoutFailing()
+        {
+            ResourceDefinition mana = TestResources.Create("mana", defaultMax: 40f);
+            pawn.Spawn();
+            pawn.Resources.Register(mana);
+            PawnSaveData data = pawn.CaptureState();
+
+            Pawn loaded = TestPawns.Create(definition, "Loaded");
+            try
+            {
+                Assert.DoesNotThrow(() => loaded.RestoreState(data));
+            }
+            finally
+            {
+                Object.DestroyImmediate(loaded.gameObject);
+            }
         }
 
         [Test]
@@ -134,6 +194,33 @@ namespace EldritchGames.PawnSystem.Tests.EditMode
         }
 
         [Test]
+        public void RestoreState_RestoresAnIncapacitatedPawnAsIncapacitated()
+        {
+            PawnDefinition downable = new PawnDefinitionBuilder().WithId("knight").WithMaxVital(20f).WithCanBeIncapacitated(true).Build();
+            pawn = TestPawns.Create(downable);
+            pawn.Spawn();
+            pawn.ApplyDamage(new DamageInfo(50f));
+            PawnSaveData data = pawn.CaptureState();
+
+            Pawn loaded = TestPawns.Create(downable, "Loaded");
+            try
+            {
+                int incapacitatedCount = 0;
+                loaded.Incapacitated += (_, __) => incapacitatedCount++;
+
+                loaded.RestoreState(data);
+
+                Assert.AreEqual(PawnState.Incapacitated, loaded.State, "A save made while downed loads back downed.");
+                Assert.AreEqual(0f, loaded.Vitals.Current, 0.0001f);
+                Assert.AreEqual(1, incapacitatedCount, "Restoring drives the pawn through its normal lifecycle, so the event still fires — same contract as restoring to Dead.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(loaded.gameObject);
+            }
+        }
+
+        [Test]
         public void RestoreState_WithAnUnknownTeamId_LeavesTheDefaultTeamInPlace()
         {
             pawn.Spawn();
@@ -167,6 +254,25 @@ namespace EldritchGames.PawnSystem.Tests.EditMode
                 foreach (TeamDefinition team in teams)
                     if (team.Id == id)
                         return team;
+
+                return null;
+            }
+        }
+
+        private sealed class TestResourceLookup : IResourceLookup
+        {
+            private readonly ResourceDefinition[] resources;
+
+            public TestResourceLookup(params ResourceDefinition[] resources)
+            {
+                this.resources = resources;
+            }
+
+            public ResourceDefinition FindResource(string id)
+            {
+                foreach (ResourceDefinition resource in resources)
+                    if (resource.Id == id)
+                        return resource;
 
                 return null;
             }

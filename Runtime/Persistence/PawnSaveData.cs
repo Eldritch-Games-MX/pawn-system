@@ -22,6 +22,14 @@ namespace EldritchGames.PawnSystem.Persistence
     [Serializable]
     public sealed class PawnSaveData
     {
+        /// <summary>
+        /// The shape of this record. Bump <see cref="CurrentSchemaVersion"/> and branch on this
+        /// field in <see cref="PawnPersistence.RestoreState"/> when a future field addition or
+        /// removal needs a migration — records with no version at all (from before this field
+        /// existed) deserialize as <c>0</c>, which is deliberately not a valid current version.
+        /// </summary>
+        public int schemaVersion;
+
         /// <summary>The <see cref="Identity.PawnDefinition.Id"/> of the pawn's definition, used to match this record to a pawn.</summary>
         public string pawnId;
 
@@ -45,5 +53,11 @@ namespace EldritchGames.PawnSystem.Persistence
 
         /// <summary>World-space rotation at the moment of capture.</summary>
         public Quaternion rotation;
+
+        /// <summary>Every registered secondary resource pool at the moment of capture.</summary>
+        public ResourceSaveData[] resources = Array.Empty<ResourceSaveData>();
+
+        /// <summary>The current schema shape. Bump this when <see cref="PawnSaveData"/>'s fields change in a way older saves cannot deserialize into directly.</summary>
+        public const int CurrentSchemaVersion = 1;
     }
 }

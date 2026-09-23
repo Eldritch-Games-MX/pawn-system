@@ -31,10 +31,15 @@ namespace EldritchGames.PawnSystem.Editor
         private SerializedProperty spawnInvulnerability;
         private SerializedProperty releaseOnDeath;
         private SerializedProperty deactivateOnDespawn;
+        private SerializedProperty canBeIncapacitated;
+        private SerializedProperty incapacitationDuration;
+        private SerializedProperty releaseOnIncapacitation;
+        private SerializedProperty initialResources;
 
         private bool identityExpanded = true;
         private bool vitalsExpanded = true;
         private bool lifecycleExpanded = true;
+        private bool resourcesExpanded = true;
 
         private void OnEnable()
         {
@@ -48,6 +53,10 @@ namespace EldritchGames.PawnSystem.Editor
             spawnInvulnerability = serializedObject.FindProperty("spawnInvulnerability");
             releaseOnDeath = serializedObject.FindProperty("releaseOnDeath");
             deactivateOnDespawn = serializedObject.FindProperty("deactivateOnDespawn");
+            canBeIncapacitated = serializedObject.FindProperty("canBeIncapacitated");
+            incapacitationDuration = serializedObject.FindProperty("incapacitationDuration");
+            releaseOnIncapacitation = serializedObject.FindProperty("releaseOnIncapacitation");
+            initialResources = serializedObject.FindProperty("initialResources");
         }
 
         /// <inheritdoc/>
@@ -95,6 +104,34 @@ namespace EldritchGames.PawnSystem.Editor
                         "Release On Death is off, so a player or AI keeps driving this pawn after it dies. Commands are still dropped while the pawn is dead — turn this off only when something in the game acts through a corpse.",
                         MessageType.Info);
                 }
+
+                EditorGUILayout.Space();
+                EditorGUILayout.PropertyField(canBeIncapacitated);
+
+                if (canBeIncapacitated.boolValue)
+                {
+                    using (new EditorGUI.IndentLevelScope())
+                    {
+                        EditorGUILayout.PropertyField(incapacitationDuration);
+                        EditorGUILayout.PropertyField(releaseOnIncapacitation);
+
+                        if (incapacitationDuration.floatValue <= 0f)
+                        {
+                            EditorGUILayout.HelpBox(
+                                "Incapacitation Duration is zero, so a downed pawn never bleeds out on its own — it stays down until finished off or revived.",
+                                MessageType.None);
+                        }
+                    }
+                }
+            });
+
+            DrawSection("Resources", ref resourcesExpanded, () =>
+            {
+                EditorGUILayout.PropertyField(initialResources, true);
+
+                EditorGUILayout.HelpBox(
+                    "Secondary pools beyond the vitals above — mana, stamina, ammunition. None of them kill the pawn when they run out.",
+                    MessageType.None);
             });
 
             serializedObject.ApplyModifiedProperties();
@@ -143,7 +180,8 @@ namespace EldritchGames.PawnSystem.Editor
                     string title = string.IsNullOrWhiteSpace(definition.DisplayName) ? definition.name : definition.DisplayName;
                     EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
                     EditorGUILayout.LabelField(
-                        $"Max vital {definition.MaxVital:0.##}  ·  {definition.Tags.Count} tag(s)  ·  {definition.DamageModifiers.Count} modifier(s)",
+                        $"Max vital {definition.MaxVital:0.##}  ·  {definition.Tags.Count} tag(s)  ·  {definition.DamageModifiers.Count} modifier(s)  ·  {definition.InitialResources.Count} resource(s)"
+                        + (definition.CanBeIncapacitated ? "  ·  incapacitatable" : string.Empty),
                         EditorStyles.miniLabel);
                 }
             }
