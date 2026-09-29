@@ -22,6 +22,40 @@ character shapes (player character, NPC, boss, turret, vehicle, board piece) map
 onto the system, and `Documentation~/extending-pawns.md` for how to add
 capabilities in a downstream project without modifying this package.
 
+## Requirements
+
+Unity 6000.3 or later. No package dependencies for the core; the optional
+adapters need their matching sibling package installed (see below).
+
+## Installation
+
+### Via the Unity Package Manager
+
+**Window → Package Manager → + → Add package from git URL**, then paste:
+
+```
+https://github.com/Eldritch-Games-MX/pawn-system.git
+```
+
+### Via `manifest.json`
+
+Add directly to `Packages/manifest.json`:
+
+```json
+"com.eldritchgames.pawnsystem": "https://github.com/Eldritch-Games-MX/pawn-system.git"
+```
+
+Left unpinned to a commit or tag on purpose — a project always gets the latest
+version on `main` this way. Pin to a specific commit (`...pawn-system.git#<sha>`)
+only if a project needs to freeze the version deliberately.
+
+The optional adapter assemblies (`EldritchGames.PawnSystem.InputSystem`,
+`EldritchGames.PawnSystem.AbilitySystem`, `EldritchGames.PawnSystem.InteractionSystem`)
+compile in automatically once the matching sibling package
+(`com.eldritchgames.inputsystem`, `com.eldritchgames.abilitysystem`,
+`com.eldritchgames.interactionsystem`) is also installed in the project — no
+extra step needed, and no error if it isn't.
+
 ## Quick start
 
 1. Create a `PawnDefinition` asset (**Assets > Create > Eldritch Games > Pawn
@@ -227,6 +261,7 @@ IDE tooltips) and in `Documentation~/architecture.md`; this is the map.
 | `ApplyDamage(in DamageInfo)` | → amount actually applied, after modifiers/invulnerability; downs an incapacitation-capable pawn instead of killing it on a fatal blow |
 | `Heal(amount)` | No-op while dead or incapacitated |
 | `Kill(DeathInfo)` | Forces death, bypassing invulnerability and incapacitation — always straight to `Dead` |
+| `TryIncapacitate(DeathInfo)` | → `bool`; downs a living pawn without damaging it (thrown object, stun, takedown), regardless of `CanBeIncapacitated` |
 | `TryRevive(ReviveInfo)` | → `ReviveResult`; recovers a dead **or** incapacitated pawn back to `Alive` |
 | `SetInvulnerable(bool)` / `SetInvulnerable(duration)` | Indefinite or timed immunity |
 | `Tick(amount)` | Advances timed state (invulnerability, bleed-out) — call once per frame or round |

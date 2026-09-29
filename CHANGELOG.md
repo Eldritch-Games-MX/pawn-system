@@ -2,6 +2,14 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.3.0] - Unreleased
+
+### Added
+- `Pawn.TryIncapacitate(DeathInfo)`: downs a living pawn without damaging it — for knock-outs that are not a fatal blow (a thrown object, a stun, a takedown). Works regardless of `PawnDefinition.CanBeIncapacitated`, which still only decides what a fatal blow does. Once down, the pawn follows the usual incapacitation rules.
+
+### Changed
+- Package metadata corrected for the published repo: `documentationUrl` pointed at the real GitHub repo instead of a placeholder, and `changelogUrl`/`licensesUrl` added so the Package Manager window links to both. The README now has an Installation section (git URL and `manifest.json` entry) — previously missing entirely.
+
 ## [0.2.0] - Unreleased
 
 ### Added

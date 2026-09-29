@@ -666,11 +666,32 @@ namespace EldritchGames.PawnSystem
         }
 
         /// <summary>
+        /// Downs a living pawn without touching its vitals: <see cref="PawnState.Alive"/> becomes
+        /// <see cref="PawnState.Incapacitated"/>.
+        /// </summary>
+        /// <param name="info">What to record as the cause; defaults to an empty record.</param>
+        /// <returns><c>true</c> if the pawn was alive and is now incapacitated; <c>false</c> (and nothing raised) in every other state.</returns>
+        /// <remarks>
+        /// For knock-outs that are not damage — a thrown crate, a stun, a takedown. Unlike a fatal
+        /// blow it works whether or not <see cref="PawnDefinition.CanBeIncapacitated"/> is set: that
+        /// flag only decides what a <em>fatal blow</em> does. Vitals stay exactly where they were.
+        /// Once down, the usual rules apply: any qualifying hit or
+        /// <see cref="Kill"/> finishes it, and <see cref="PawnDefinition.IncapacitationDuration"/>
+        /// still runs the bleed-out timer.
+        /// </remarks>
+        public bool TryIncapacitate(DeathInfo info = default)
+        {
+            if (State != PawnState.Alive) return false;
+            Incapacitate(info);
+            return true;
+        }
+
+        /// <summary>
         /// Downs the pawn straight to <see cref="PawnState.Incapacitated"/>, no-op unless it is
-        /// currently <see cref="PawnState.Alive"/>. Internal because the only callers are
-        /// <see cref="ApplyDamage"/>, <see cref="OnVitalsChanged"/>, and
+        /// currently <see cref="PawnState.Alive"/>. Internal because the callers that own the
+        /// transition are <see cref="ApplyDamage"/>, <see cref="OnVitalsChanged"/>, and
         /// <see cref="Persistence.PawnPersistence.RestoreState"/> restoring a saved incapacitated
-        /// pawn — everything else reaches this state through those, never directly.
+        /// pawn; everyone else goes through <see cref="TryIncapacitate"/>.
         /// </summary>
         /// <param name="info">What to record as the cause.</param>
         internal void Incapacitate(in DeathInfo info)
