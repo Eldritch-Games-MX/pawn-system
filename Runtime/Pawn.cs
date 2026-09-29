@@ -36,7 +36,7 @@ namespace EldritchGames.PawnSystem
     /// nothing and raised no events.
     /// </para>
     /// </remarks>
-    public sealed class Pawn : MonoBehaviour, IDamageable
+    public sealed class Pawn : MonoBehaviour, IDamageable, IDamageTarget
     {
         [Header("Bindings")]
         [Tooltip("The authored recipe for this pawn: identity, team, vitals and death behaviour.")]
@@ -111,6 +111,11 @@ namespace EldritchGames.PawnSystem
         /// No vital source was assigned and there is no <see cref="PawnDefinition"/> to build one from.
         /// </exception>
         public IVitalSource Vitals => vitals ?? BuildVitals();
+
+        // IDamageTarget is deliberately explicit — it exists only for IDamageModifier.Modify, and
+        // ViewPoint/Vitals above already cover the same ground as public, more specific members.
+        Transform IDamageTarget.Transform => transform;
+        IVitalSource IDamageTarget.Vitals => Vitals;
 
         /// <summary>
         /// How this pawn moves, or <c>null</c> when it has no motor. Resolved from this GameObject

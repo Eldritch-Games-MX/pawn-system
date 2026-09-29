@@ -33,6 +33,45 @@ The rules:
   pawn from inside its own callback. If that callback throws, the possession is
   rolled back.
 
+## Pawn vs Actor
+
+Not everything that spawns, takes damage and dies is possessable — a
+destructible crate, a turret, a door. Making those a `Pawn` anyway (the
+approach the package started with) works mechanically, but it is a lie:
+`PawnDefinition.ReleaseOnDeath`/`ReleaseOnIncapacitation` are meaningless with
+no possessor to release, and every crate carries `TryPossess`/`Release`/
+`CurrentPossessor`/`Motor`/`ViewPoint` API it will never use.
+
+`Actor` is the fix: the same lifecycle state machine (`PawnState`, `ApplyDamage`,
+`Kill`, `TryRevive`, incapacitation) and the same damage pipeline, with an
+`ActorDefinition` that drops the possession-only fields, and no possession,
+motor or view-point surface at all. `IDamageModifier.Modify` takes
+`IDamageTarget` — a small interface exposing just `Transform` and `Vitals` —
+instead of a concrete `Pawn`, so a resistance or falloff-by-distance modifier
+is written once and runs against either.
+
+`Actor` is **not** `Pawn`'s base class, and `Pawn` does not compose an `Actor`
+internally. Both are sealed, standalone implementations of the same documented
+lifecycle contract. Three considered alternatives and why they lost:
+
+- **`Pawn : Actor`** — would require unsealing `Actor`, breaking "seal
+  everything, extend by composition" for the one type introduced specifically
+  to model something *without* extension points.
+- **`Actor` composes a shared internal (non-MonoBehaviour) core, `Pawn` too** —
+  the architecturally "purest" option, but it means retrofitting `Pawn`'s
+  internals purely for an implementation-sharing refactor with zero behavioral
+  benefit to `Pawn` itself, risking the existing Pawn test suite for no
+  observable gain.
+- **`Destructible` as the new type's name** — narrower than the actual need
+  (a turret or a door is not "destructible" in the way a crate is, but both
+  need the same non-possessable lifecycle). `Actor` was chosen instead,
+  deliberately echoing Unreal's own `AActor`/`APawn` split.
+
+The cost of the choice actually made: the two lifecycles must be kept in sync
+by hand if the shared contract ever changes. Both are covered by the same
+shape of EditMode test suite for exactly that reason — a change to one's
+behavior should show up as a now-failing mirror test on the other.
+
 ## Capabilities, not inheritance
 
 `Pawn.TryGet<T>` checks the pawn itself, then components on the GameObject and

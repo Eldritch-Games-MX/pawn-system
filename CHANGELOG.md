@@ -2,6 +2,15 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.4.0] - Unreleased
+
+### Added
+- `Actor` and `ActorDefinition`: the same lifecycle as `Pawn` (spawn, damage, incapacitation, revival, despawn) for a world object that is never possessed — a destructible crate, a turret, a door. Sealed like `Pawn`, with the identical damage pipeline, `PawnState` machine and `TryGet<T>` capability lookup, but no possession, motor or view-point API to carry around unused. Deliberately its own implementation rather than sharing code with `Pawn` behind a common internal base — see the type's remarks for why.
+- `IDamageTarget`: the minimal surface (`Transform`, `Vitals`) an `IDamageModifier` needs from whatever is about to take a hit. Implemented by both `Pawn` and `Actor`, so a resistance or falloff modifier is written once and works against either.
+
+### Changed
+- **Breaking:** `IDamageModifier.Modify` now takes `IDamageTarget` instead of a concrete `Pawn`, so the damage pipeline works for both `Pawn` and `Actor`. A custom modifier updates its `Modify` signature; nothing about the pipeline's behavior, order or built-in `FlatDamageReduction` changes.
+
 ## [0.3.0] - Unreleased
 
 ### Added

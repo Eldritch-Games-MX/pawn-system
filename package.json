@@ -1,14 +1,14 @@
 {
   "name": "com.eldritchgames.pawnsystem",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "displayName": "Pawn System",
-  "description": "Genre-agnostic pawn framework for Unity. A Pawn is any character in the world — player- or AI-driven — with identity, vitals, a movement seam, and a lifecycle covering spawn, death, revival, possession and release. The core has no input, ability or interaction dependency; optional adapter assemblies bridge it to the Eldritch Input System and Ability System.",
+  "description": "Genre-agnostic pawn framework for Unity. A Pawn is any character in the world — player- or AI-driven — with identity, vitals, a movement seam, and a lifecycle covering spawn, death, revival, possession and release. An Actor covers the same lifecycle for a world object that is never possessed. The core has no input, ability or interaction dependency; optional adapter assemblies bridge it to the Eldritch Input System and Ability System.",
   "unity": "6000.3",
   "documentationUrl": "https://github.com/Eldritch-Games-MX/pawn-system#readme",
   "changelogUrl": "https://github.com/Eldritch-Games-MX/pawn-system/blob/main/CHANGELOG.md",
   "licensesUrl": "https://github.com/Eldritch-Games-MX/pawn-system/blob/main/LICENSE.md",
   "license": "See LICENSE.md",
-  "keywords": ["pawn", "character", "possession", "gameplay", "eldritchgames"],
+  "keywords": ["pawn", "actor", "character", "possession", "gameplay", "eldritchgames"],
   "author": {
     "name": "Eldritch Games",
     "email": "carlos.alberto.gdea.ch@gmail.com"
