@@ -104,6 +104,10 @@ duplicating it:
 - `Kill()` always goes straight to `Dead`, whether called on a living pawn or to
   finish one already down. It is the one path that never routes through
   `Incapacitated`, by design — it is the "no matter what" method.
+- `TryIncapacitate()` downs a *living* pawn without damage — a thrown object, a
+  stun, a takedown. It ignores `CanBeIncapacitated` (that flag only decides what
+  a fatal blow does) and leaves vitals untouched; afterwards the pawn follows
+  the same rules as any downed pawn.
 - An optional bleed-out timer (`PawnDefinition.IncapacitationDuration`) is just
   another field `Tick` counts down, exactly like the invulnerability grace
   period already did.

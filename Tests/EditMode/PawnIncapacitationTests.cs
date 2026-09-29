@@ -244,6 +244,59 @@ namespace EldritchGames.PawnSystem.Tests.EditMode
             Assert.IsTrue(pawn.IsIncapacitated);
         }
 
+        [Test]
+        public void TryIncapacitate_OnALivingPawn_DownsItWithoutTouchingVitals()
+        {
+            pawn = SpawnWith(new PawnDefinitionBuilder().WithId("a").WithMaxVital(20f).Build());
+            int incapacitatedCount = 0;
+            pawn.Incapacitated += (_, __) => incapacitatedCount++;
+
+            bool downed = pawn.TryIncapacitate();
+
+            Assert.IsTrue(downed);
+            Assert.AreEqual(PawnState.Incapacitated, pawn.State, "A knock-out does not depend on CanBeIncapacitated; that flag only governs fatal blows.");
+            Assert.AreEqual(20f, pawn.Vitals.Current, 0.0001f, "A knock-out is not damage.");
+            Assert.AreEqual(1, incapacitatedCount);
+        }
+
+        [Test]
+        public void TryIncapacitate_WhenNotAlive_ReturnsFalseAndRaisesNothing()
+        {
+            pawn = SpawnWith(new PawnDefinitionBuilder().WithId("a").WithMaxVital(20f).Build());
+            pawn.Kill();
+            int incapacitatedCount = 0;
+            pawn.Incapacitated += (_, __) => incapacitatedCount++;
+
+            Assert.IsFalse(pawn.TryIncapacitate(), "A corpse cannot be knocked out.");
+            Assert.AreEqual(PawnState.Dead, pawn.State);
+            Assert.AreEqual(0, incapacitatedCount);
+        }
+
+        [Test]
+        public void TryIncapacitate_CalledTwice_SecondCallIsNoOp()
+        {
+            pawn = SpawnWith(new PawnDefinitionBuilder().WithId("a").WithMaxVital(20f).Build());
+            int incapacitatedCount = 0;
+            pawn.Incapacitated += (_, __) => incapacitatedCount++;
+
+            pawn.TryIncapacitate();
+            bool second = pawn.TryIncapacitate();
+
+            Assert.IsFalse(second);
+            Assert.AreEqual(1, incapacitatedCount);
+        }
+
+        [Test]
+        public void KnockedOutPawn_IsFinishedByALaterHit()
+        {
+            pawn = SpawnWith(new PawnDefinitionBuilder().WithId("a").WithMaxVital(20f).Build());
+            pawn.TryIncapacitate();
+
+            pawn.ApplyDamage(new DamageInfo(1f));
+
+            Assert.AreEqual(PawnState.Dead, pawn.State);
+        }
+
         private static Pawn SpawnWith(PawnDefinition definition)
         {
             Pawn created = TestPawns.Create(definition);
