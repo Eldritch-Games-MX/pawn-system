@@ -1,9 +1,9 @@
 # Pawn taxonomy
 
-Every row below is a character shape from a different genre, expressed with the
-same `Pawn` component and no package changes. If a shape you need is not here and
-does not fall out of these parts, that is worth a design conversation before
-adding anything to the core.
+Every row below is a character shape from a different genre, expressed with
+`Pawn` (or `Actor`, for the rows with no possessor at all) and no package
+changes. If a shape you need is not here and does not fall out of these parts,
+that is worth a design conversation before adding anything to the core.
 
 | Shape | Definition | Components | Possession | Notes |
 |---|---|---|---|---|
@@ -12,8 +12,9 @@ adding anything to the core.
 | **Melee NPC** | Team `Monsters`, tags `Beast` | Motor, your AI brain component | Your `IPawnPossessor` | Identical API to the player case |
 | **Boss** | Large Max Vital, `FlatDamageReduction`, tag `Boss` | Hit zones with multipliers, phase components | AI possessor swapped per phase | Phases = swapping the possessor, not subclassing |
 | **Companion** | Team `Players`, tag `Ally` | Motor, follow component | AI possessor the player can take over | The body never changes; only the driver does |
-| **Turret / camera** | Max Vital, Release On Death off | No motor; an aim component | AI or player | A pawn with no movement is still a pawn |
-| **Destructible prop** | Max Vital, no team | `DamageReceiver` only | None | Or skip `Pawn` and implement `IDamageable` directly |
+| **Turret / camera (manned)** | Max Vital, Release On Death off | No motor; an aim component | AI or player | A pawn with no movement is still a pawn |
+| **Turret / camera (automated)** | `ActorDefinition`, Max Vital | An aim component reading `Actor.State` | None — it is an `Actor` | Never has and never will have a driver; `Pawn`'s possession API would just be dead weight |
+| **Destructible prop** | `ActorDefinition`, Max Vital, no team | `DamageReceiver` only | None — it is an `Actor` | `CanBeIncapacitated` for a two-stage break (cracked, then destroyed) |
 | **Vehicle** | Own vitals and team | Vehicle motor implementing `IPawnMotor` | The driver's possessor, moved from the character pawn | Entering a vehicle = release one pawn, possess another |
 | **Possessing ghost** | Ghost pawn with its own vitals | — | One possessor that moves between bodies | Exactly what symmetric possession is for |
 | **Board piece** | Max Vital 1, team per side | None | Player or AI | `Spawn` / `Kill` / `TryRevive` model captures and promotions |

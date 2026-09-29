@@ -40,11 +40,11 @@ namespace EldritchGames.PawnSystem.TestUtilities
         /// <summary>How many times <see cref="Modify"/> has been called on this instance.</summary>
         public int ModifyCallCount { get; private set; }
 
-        /// <summary>The pawn passed to the most recent call, or <c>null</c> when it has never run.</summary>
-        public Pawn LastTarget { get; private set; }
+        /// <summary>The target passed to the most recent call, or <c>null</c> when it has never run.</summary>
+        public IDamageTarget LastTarget { get; private set; }
 
         /// <inheritdoc/>
-        public DamageInfo Modify(Pawn target, DamageInfo damage)
+        public DamageInfo Modify(IDamageTarget target, DamageInfo damage)
         {
             ModifyCallCount++;
             LastTarget = target;

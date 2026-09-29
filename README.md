@@ -10,6 +10,11 @@ Possession is symmetric, the way Unreal models it: a player controller and an AI
 brain are both `IPawnPossessor`, and the pawn cannot tell which one is driving
 it. That is what makes a body swappable mid-game.
 
+Not everything with a lifecycle is possessable, though — a destructible crate,
+a turret, a door. `Actor` covers exactly that: the same spawn/damage/death/
+incapacitation/revival lifecycle as `Pawn`, with no possession, movement or
+view-point to carry around unused. See [`Pawn` vs `Actor`](#pawn-vs-actor) below.
+
 The core has **no package dependencies** — not on input, not on abilities, not on
 interaction. Three optional adapter assemblies bridge it to the Eldritch Input
 System (possession by a player), the Eldritch Ability System (vitals backed by
@@ -76,6 +81,20 @@ extra step needed, and no error if it isn't.
    game, or `pawn.Tick(1f)` per round in a turn-based one. The package has no
    `Update` of its own.
 
+### Pawn vs Actor
+
+| | `Pawn` | `Actor` |
+|---|---|---|
+| Possession, `Motor`, `ViewPoint` | Yes | No |
+| Identity, `Tags`, `Vitals`, damage pipeline | Yes | Yes |
+| Lifecycle (`Spawn`/`Despawn`/`ApplyDamage`/`Kill`/`TryRevive`/`TryIncapacitate`/`Tick`) | Yes | Yes (identical contract) |
+| Definition | `PawnDefinition` | `ActorDefinition` (no team, no possession-release flags, no secondary resources) |
+
+Use `Pawn` for anything a player or an AI drives. Use `Actor` for everything
+else that still needs to spawn, take damage, die, and maybe come back — most of
+a level's destructibles, hazards and interactive-but-not-driven set dressing.
+If an archetype ever needs a possessor, it needs a `Pawn`, not an `Actor`.
+
 ## Examples
 
 ### Spawn, possess, release
@@ -123,6 +142,18 @@ pawn.ApplyDamage(anotherHit);         // any further hit finishes it — State b
 pawn.TryRevive(ReviveInfo.Full);      // the same call recovers a downed pawn or a corpse
 
 void Update() => pawn.Tick(Time.deltaTime);   // counts down the bleed-out timer, if any
+```
+
+### A world object without a possessor
+
+```csharp
+Actor crate = Instantiate(cratePrefab).GetComponent<Actor>();
+crate.Spawn();
+
+crate.Died += (destroyed, info) => SpawnDebris(destroyed.transform.position);
+
+crate.ApplyDamage(new DamageInfo(25f, fireType, instigator: player));   // same DamageInfo, same pipeline
+// no TryPossess, no Motor, no ViewPoint — a crate is never driven
 ```
 
 ### Secondary resources
@@ -272,11 +303,32 @@ IDE tooltips) and in `Documentation~/architecture.md`; this is the map.
 | `RefreshComponentModifiers()` | Re-scans `IDamageModifier` components after adding/removing one |
 | `Spawned`, `Despawned`, `Revived`, `DamageTaken`, `Died`, `Incapacitated`, `Possessed`, `Released` | Events |
 
+### `Actor` (sealed MonoBehaviour, for a world object that is never possessed)
+
+Same contract as `Pawn` for everything below — spawn, damage, incapacitation,
+revival, despawn, capability lookup — minus possession, `Motor` and `ViewPoint`.
+See [Pawn vs Actor](#pawn-vs-actor) above.
+
+| Member | Description |
+|---|---|
+| `Definition` | The `ActorDefinition` this actor was built from |
+| `State` / `IsAlive` / `IsIncapacitated` | Same `PawnState` machine as `Pawn` |
+| `Tags` | Runtime `PawnTagContainer`, seeded from the definition |
+| `Vitals` | The `IVitalSource` backing health/hull/sanity/etc. |
+| `IsInvulnerable` / `InvulnerabilityRemaining` / `IncapacitationRemaining` | Same semantics as `Pawn` |
+| `Spawn()` / `Spawn(position, rotation)` / `Despawn()` | Same contract as `Pawn`, without a motor seam — placement always sets the transform directly |
+| `ApplyDamage(in DamageInfo)` / `Heal(amount)` / `Kill(DeathInfo)` / `TryIncapacitate(DeathInfo)` / `TryRevive(ReviveInfo)` | Identical to the equivalent `Pawn` members |
+| `SetInvulnerable(bool)` / `SetInvulnerable(duration)` / `Tick(amount)` | Identical to `Pawn` |
+| `TryGet<T>(out capability)` | Capability lookup, same shape as `Pawn.TryGet<T>` |
+| `SetVitalSource(IVitalSource)` / `RefreshComponentModifiers()` | Identical to `Pawn` |
+| `Spawned`, `Despawned`, `Revived`, `DamageTaken`, `Died`, `Incapacitated` | Events — no `Possessed`/`Released`, there is no possessor |
+
 ### Identity
 
 | Type | Purpose |
 |---|---|
 | `PawnDefinition` (SO) | Authored id, display name, icon, team, tags, max vital, damage modifiers |
+| `ActorDefinition` (SO) | The `Actor` equivalent — same shape minus team and the possession-only flags |
 | `PawnTag` / `PawnTagContainer` | Dotted hierarchical tags (`"Status.Stunned"`) |
 | `TeamDefinition` (SO) | A side, with hostile/friendly team lists |
 | `ITeamResolver` / `DefaultTeamResolver` | Resolves `PawnRelationship` (Friendly/Neutral/Hostile) between two pawns |
@@ -288,10 +340,11 @@ IDE tooltips) and in `Documentation~/architecture.md`; this is the map.
 | `IVitalSource` / `Health` | The seam for health/hull/sanity/etc., and its default implementation |
 | `DamageInfo` | Immutable damage event: amount, type, instigator, source, body part, hit point |
 | `DamageTypeDefinition` (SO) | An authored damage kind, replacing a closed enum |
-| `IDamageModifier` / `FlatDamageReduction` | Pipeline step for armor/resistance, and its built-in |
+| `IDamageTarget` | The minimal surface (`Transform`, `Vitals`) a modifier needs from whatever it is modifying damage for; implemented by both `Pawn` and `Actor` |
+| `IDamageModifier` / `FlatDamageReduction` | Pipeline step for armor/resistance (takes `IDamageTarget`, not a concrete `Pawn`), and its built-in |
 | `DamageReceiver` | Per-collider hit zone with a multiplier and body-part tag |
 | `DeathInfo` / `ReviveInfo` | Structured death/revive payloads |
-| `IDamageable` | Implemented by `Pawn`; targetable by weapons/traps generically |
+| `IDamageable` | Implemented by `Pawn` and `Actor`; targetable by weapons/traps generically |
 | `ResourceDefinition` (SO) | An authored secondary resource — mana, stamina, ammunition |
 | `PawnResourcePool` | A pawn's registered resources; `Register`/`ApplyDelta`/`SetMax`/`Fill` per resource |
 

@@ -1,17 +1,18 @@
 namespace EldritchGames.PawnSystem
 {
     /// <summary>
-    /// The outcome of <see cref="Pawn.Spawn()"/>. Every failure leaves the pawn exactly as it was.
+    /// The outcome of <see cref="Pawn.Spawn()"/> or <see cref="Actor.Spawn()"/>. Every failure leaves
+    /// it exactly as it was.
     /// </summary>
     public enum SpawnResult
     {
-        /// <summary>The pawn entered play: vitals filled, state <see cref="PawnState.Alive"/>, <see cref="Pawn.Spawned"/> raised.</summary>
+        /// <summary>It entered play: vitals filled, state <see cref="PawnState.Alive"/>, <see cref="Pawn.Spawned"/>/<see cref="Actor.Spawned"/> raised.</summary>
         Success = 0,
 
-        /// <summary>The pawn was already <see cref="PawnState.Alive"/> or <see cref="PawnState.Dead"/>. Nothing changed.</summary>
+        /// <summary>It was already <see cref="PawnState.Alive"/> or <see cref="PawnState.Dead"/>. Nothing changed.</summary>
         AlreadySpawned = 1,
 
-        /// <summary>No <see cref="Identity.PawnDefinition"/> is assigned, so the pawn has no vitals, team or identity to spawn with.</summary>
+        /// <summary>No <see cref="Identity.PawnDefinition"/>/<see cref="Identity.ActorDefinition"/> is assigned, so there is no vitals or identity to spawn with.</summary>
         MissingDefinition = 2
     }
 }

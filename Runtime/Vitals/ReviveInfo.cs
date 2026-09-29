@@ -1,13 +1,13 @@
 namespace EldritchGames.PawnSystem.Vitals
 {
     /// <summary>
-    /// How a dead <see cref="Pawn"/> comes back: how much of its vitals are restored, who brought
-    /// it back, and how long it is protected afterwards.
+    /// How a dead <see cref="Pawn"/> or <see cref="Actor"/> comes back: how much of its vitals are
+    /// restored, who brought it back, and how long it is protected afterwards.
     /// </summary>
     /// <remarks>
-    /// Revival is always explicit. Healing a dead pawn does nothing — a corpse is brought back by
-    /// <see cref="Pawn.TryRevive"/> and no other path, so a stray heal can never silently
-    /// resurrect something.
+    /// Revival is always explicit. Healing something dead does nothing — it is brought back by
+    /// <see cref="Pawn.TryRevive"/>/<see cref="Actor.TryRevive"/> and no other path, so a stray heal
+    /// can never silently resurrect it.
     /// <code>
     /// pawn.TryRevive(ReviveInfo.Full);                       // full vitals, definition's grace period
     /// pawn.TryRevive(new ReviveInfo(0.25f, instigator: medic)); // a quarter of max
@@ -25,8 +25,9 @@ namespace EldritchGames.PawnSystem.Vitals
         public Pawn Instigator { get; }
 
         /// <summary>
-        /// Seconds of invulnerability granted after the revival. Negative means "use the pawn's
-        /// <see cref="Identity.PawnDefinition.SpawnInvulnerability"/>".
+        /// Seconds of invulnerability granted after the revival. Negative means "use the
+        /// definition's Spawn Invulnerability" (<see cref="Identity.PawnDefinition.SpawnInvulnerability"/>
+        /// or <see cref="Identity.ActorDefinition.SpawnInvulnerability"/>).
         /// </summary>
         public float InvulnerabilityDuration { get; }
 

@@ -3,13 +3,13 @@ using EldritchGames.PawnSystem.Identity;
 namespace EldritchGames.PawnSystem.Vitals
 {
     /// <summary>
-    /// Why a <see cref="Pawn"/> died: who or what killed it, with what, where it was hit, and by
-    /// how much the final blow overshot.
+    /// Why a <see cref="Pawn"/> or an <see cref="Actor"/> died: who or what killed it, with what,
+    /// where it was hit, and by how much the final blow overshot.
     /// </summary>
     /// <remarks>
-    /// Carried by <see cref="Pawn.Died"/> so score, loot, kill feeds, gore and achievements can
-    /// all read the same record. Every field is optional — a pawn removed by a cutscene or a
-    /// falling-out-of-the-world volume dies with an empty <c>DeathInfo</c>.
+    /// Carried by <see cref="Pawn.Died"/>/<see cref="Actor.Died"/> so score, loot, kill feeds, gore
+    /// and achievements can all read the same record. Every field is optional — something removed
+    /// by a cutscene or a falling-out-of-the-world volume dies with an empty <c>DeathInfo</c>.
     /// <code>
     /// pawn.Died += (dead, info) =>
     /// {

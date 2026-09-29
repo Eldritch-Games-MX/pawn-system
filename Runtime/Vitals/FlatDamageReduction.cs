@@ -9,11 +9,13 @@ namespace EldritchGames.PawnSystem.Vitals
     /// </summary>
     /// <remarks>
     /// Ships as the one minimal implementation so a project has something to drop into
-    /// <see cref="Identity.PawnDefinition.DamageModifiers"/> on day one and a worked example to copy when
-    /// writing percentage resistances, hit-zone multipliers or difficulty scaling.
+    /// <see cref="Identity.PawnDefinition.DamageModifiers"/> or <see cref="Identity.ActorDefinition.DamageModifiers"/>
+    /// on day one and a worked example to copy when writing percentage resistances, hit-zone
+    /// multipliers or difficulty scaling.
     /// <para>
     /// Damage is never pushed below zero, and a fully absorbed hit still travels the rest of the
-    /// pipeline and still reaches <see cref="Pawn.DamageTaken"/> with an amount of zero.
+    /// pipeline and still reaches <see cref="Pawn.DamageTaken"/> or <see cref="Actor.DamageTaken"/>
+    /// with an amount of zero.
     /// </para>
     /// </remarks>
     [Serializable]
@@ -33,7 +35,7 @@ namespace EldritchGames.PawnSystem.Vitals
         public DamageTypeDefinition DamageType => damageType;
 
         /// <inheritdoc/>
-        public DamageInfo Modify(Pawn target, DamageInfo damage)
+        public DamageInfo Modify(IDamageTarget target, DamageInfo damage)
         {
             if (damageType != null && damage.Type != damageType) return damage;
 

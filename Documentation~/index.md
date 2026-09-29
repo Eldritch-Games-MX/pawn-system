@@ -4,6 +4,10 @@ A pawn is anything in the world that a player or an AI can drive. This package
 gives that idea one component, one lifecycle and a small set of seams, and
 refuses to know anything else about your game.
 
+Not everything that spawns and dies is driven, though. `Actor` gives a
+destructible crate, a turret or a door the identical lifecycle without a
+possessor — see [Pawn vs Actor](architecture.md#pawn-vs-actor).
+
 ## Design principles
 
 1. **One pawn for players and NPCs.** Possession is symmetric: a player
